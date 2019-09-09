@@ -1,0 +1,5 @@
+#!/bin/bash
+
+apk add raspberrypi-dev
+
+./install-libcec.base
