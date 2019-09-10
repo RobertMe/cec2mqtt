@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/RobertMe/cec2mqtt/messages"
-	"time"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
-	fmt.Println("Started")
+	fmt.Println("Starting cec2mqtt")
 
 	config, err := ParseConfig("/etc/cec2mqtt.yaml")
 
@@ -15,7 +16,7 @@ func main() {
 		panic(err)
 	}
 
-	_, err = ConnectMqtt(config)
+	mqtt, err := ConnectMqtt(config)
 
 	if nil != err {
 		panic(err)
@@ -23,19 +24,21 @@ func main() {
 
 	cec, _ := InitialiseCec("")
 
-	go listener(cec.Messages)
+	_ = NewBridge(config, cec, mqtt)
+
 	cec.Start()
 
-	for {
-		time.Sleep(20 * time.Second)
-	}
-}
+	signals := make(chan os.Signal, 1)
+	done := make(chan bool, 1)
 
-func listener(messages chan messages.Message) {
-	for {
-		select {
-		case message := <- messages:
-			fmt.Printf("%s => %s\n", message.MqttPath(), message.Value())
-		}
-	}
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<- signals
+		done <- true
+	}()
+
+	fmt.Println("Cec2mqtt started")
+	<- done
+	fmt.Println("Exiting")
 }
