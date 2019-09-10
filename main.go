@@ -8,6 +8,19 @@ import (
 
 func main() {
 	fmt.Println("Started")
+
+	config, err := ParseConfig("/etc/cec2mqtt.yaml")
+
+	if nil != err {
+		panic(err)
+	}
+
+	_, err = ConnectMqtt(config)
+
+	if nil != err {
+		panic(err)
+	}
+
 	cec, _ := InitialiseCec("")
 
 	go listener(cec.Messages)
