@@ -82,6 +82,8 @@ func (cec *Cec) handleLogMessage(logMessage *gocec.LogMessage) {
 		cec.handleStandbyMessage(&message)
 	case gocec.OpcodeActiveSource:
 		cec.handleActiveSourceMessage(&message)
+	case gocec.OpcodeSetSystemAudioMode:
+		cec.handleSetAudioMode(device, &message)
 	}
 }
 
@@ -112,4 +114,8 @@ func (cec *Cec) handleActiveSourceMessage(message *gocec.Message) {
 	for _, device := range cec.devices {
 		go device.MonitorPowerStatus()
 	}
+}
+
+func (cec *Cec) handleSetAudioMode(device *Device, message *gocec.Message) {
+	go device.MonitorPowerStatus()
 }
