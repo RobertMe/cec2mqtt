@@ -9,6 +9,8 @@ import (
 
 type Cec struct {
 	connection *gocec.Connection
+	adapter gocec.Adapter
+
 	devices map[gocec.LogicalAddress]*Device
 
 	Messages chan messages.Message
@@ -48,13 +50,14 @@ func InitialiseCec(path string) (*Cec, error) {
 	}
 
 	cec.connection = connection
-
-	connection.Open(adapter)
+	cec.adapter = adapter
 
 	return cec, nil
 }
 
 func (cec *Cec) Start() {
+	cec.connection.Open(cec.adapter)
+
 	addresses := cec.connection.ActiveDevices()
 
 	for _, address := range addresses {
