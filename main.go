@@ -7,6 +7,10 @@ import (
 	"syscall"
 )
 
+type Initializer func(cec *Cec, mqtt *Mqtt)
+
+var initializers = make([]Initializer, 0)
+
 func main() {
 	fmt.Println("Starting cec2mqtt")
 
@@ -24,7 +28,9 @@ func main() {
 
 	cec, _ := InitialiseCec("")
 
-	_ = NewBridge(config, cec, mqtt)
+	for _, initializer := range initializers {
+		initializer(cec, mqtt)
+	}
 
 	cec.Start()
 

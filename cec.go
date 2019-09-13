@@ -2,10 +2,13 @@ package main
 
 import (
 	"errors"
-	"github.com/RobertMe/cec2mqtt/messages"
 	"github.com/RobertMe/gocec"
 	"strings"
 )
+
+type DeviceAddedHandler func(device *Device)
+
+type MessageReceivedHandler func(message gocec.Message)
 
 type Cec struct {
 	connection *gocec.Connection
@@ -13,7 +16,8 @@ type Cec struct {
 
 	devices map[gocec.LogicalAddress]*Device
 
-	Messages chan messages.Message
+	deviceAddedHandlers []DeviceAddedHandler
+	messageReceivedHandlers map[gocec.Opcode][]MessageReceivedHandler
 }
 
 func InitialiseCec(path string) (*Cec, error) {
@@ -23,7 +27,8 @@ func InitialiseCec(path string) (*Cec, error) {
 
 	cec := &Cec{
 		devices: make(map[gocec.LogicalAddress]*Device),
-		Messages: make(chan messages.Message, 10),
+		deviceAddedHandlers: make([]DeviceAddedHandler, 0),
+		messageReceivedHandlers: make(map[gocec.Opcode][]MessageReceivedHandler),
 	}
 	config.SetLogCallback(cec.handleLogMessage)
 
@@ -55,13 +60,28 @@ func InitialiseCec(path string) (*Cec, error) {
 	return cec, nil
 }
 
+func (cec *Cec) RegisterDeviceAddedHandler(handler DeviceAddedHandler) {
+	cec.deviceAddedHandlers = append(cec.deviceAddedHandlers, handler)
+}
+
+func (cec *Cec) RegisterMessageHandler(handler MessageReceivedHandler, opcodes ...gocec.Opcode) {
+	for _, opcode := range opcodes {
+		handlers, ok := cec.messageReceivedHandlers[opcode]
+		if !ok {
+			cec.messageReceivedHandlers[opcode] = []MessageReceivedHandler{handler}
+		} else {
+			cec.messageReceivedHandlers[opcode] = append(handlers, handler)
+		}
+	}
+}
+
 func (cec *Cec) Start() {
 	cec.connection.Open(cec.adapter)
 
 	addresses := cec.connection.ActiveDevices()
 
 	for _, address := range addresses {
-		_ = cec.getDevice(address)
+		_ = cec.GetDevice(address)
 	}
 }
 
@@ -76,21 +96,18 @@ func (cec *Cec) handleLogMessage(logMessage *gocec.LogMessage) {
 
 	message, _ := gocec.ParseMessage(logMessage.Message[3:])
 
-	device := cec.getDevice(message.Source())
+	device := cec.GetDevice(message.Source())
 
-	switch message.Opcode() {
-	case gocec.OpcodeReportPowerStatus:
-		cec.handlePowerMessage(device, &message)
-	case gocec.OpcodeStandby:
-		cec.handleStandbyMessage(&message)
-	case gocec.OpcodeActiveSource:
-		cec.handleActiveSourceMessage(&message)
-	case gocec.OpcodeSetSystemAudioMode:
-		cec.handleSetAudioMode(device, &message)
+	_ = device
+
+	if handlers, ok := cec.messageReceivedHandlers[message.Opcode()]; ok {
+		for _, handler := range handlers {
+			handler(message)
+		}
 	}
 }
 
-func (cec *Cec) getDevice(address gocec.LogicalAddress) *Device {
+func (cec *Cec) GetDevice(address gocec.LogicalAddress) *Device {
 	if address == gocec.DeviceBroadcast {
 		return nil
 	}
@@ -99,26 +116,14 @@ func (cec *Cec) getDevice(address gocec.LogicalAddress) *Device {
 	if !ok {
 		device = NewDevice(address, cec)
 		cec.devices[address] = device
+
+		for _, handler := range cec.deviceAddedHandlers {
+			handler(device)
+		}
 	}
 	return device
 }
 
-func (cec *Cec) handlePowerMessage(device *Device, message *gocec.Message) {
-	device.SetPowerStatus(convertPowerStatus(gocec.PowerStatus(message.Parameters()[0])))
-}
-
-func (cec *Cec) handleStandbyMessage(message *gocec.Message) {
-	for _, device := range cec.devices {
-		go device.MonitorPowerStatus()
-	}
-}
-
-func (cec *Cec) handleActiveSourceMessage(message *gocec.Message) {
-	for _, device := range cec.devices {
-		go device.MonitorPowerStatus()
-	}
-}
-
-func (cec *Cec) handleSetAudioMode(device *Device, message *gocec.Message) {
-	go device.MonitorPowerStatus()
+func (cec *Cec) Transmit(message gocec.Message) {
+	cec.connection.Transmit(message)
 }
