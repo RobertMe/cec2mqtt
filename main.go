@@ -7,7 +7,7 @@ import (
 	"syscall"
 )
 
-type Initializer func(cec *Cec, mqtt *Mqtt)
+type Initializer func(deviceRegistry *DeviceRegistry, cec *Cec, mqtt *Mqtt)
 
 var initializers = make([]Initializer, 0)
 
@@ -20,16 +20,18 @@ func main() {
 		panic(err)
 	}
 
+	devices := NewDeviceRegistry(config)
+
 	mqtt, err := ConnectMqtt(config)
 
 	if nil != err {
 		panic(err)
 	}
 
-	cec, _ := InitialiseCec("")
+	cec, _ := InitialiseCec(devices, "")
 
 	for _, initializer := range initializers {
-		initializer(cec, mqtt)
+		initializer(devices, cec, mqtt)
 	}
 
 	cec.Start()

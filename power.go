@@ -21,7 +21,7 @@ type PowerBridge struct {
 	statesMutex sync.Mutex
 }
 
-func InitPowerBridge(cec *Cec, mqtt *Mqtt) {
+func InitPowerBridge(devices *DeviceRegistry, cec *Cec, mqtt *Mqtt) {
 	bridge := PowerBridge{
 		cec:  cec,
 		mqtt: mqtt,
@@ -30,7 +30,7 @@ func InitPowerBridge(cec *Cec, mqtt *Mqtt) {
 		states: make(map[gocec.LogicalAddress]string),
 	}
 
-	cec.RegisterDeviceAddedHandler(func(device *Device) {
+	devices.RegisterDeviceAddedHandler(func(device *Device) {
 		bridge.statesMutex.Lock()
 		bridge.monitorsMutex.Lock()
 		defer bridge.statesMutex.Unlock()

@@ -6,28 +6,30 @@ import (
 	"strings"
 )
 
-type DeviceAddedHandler func(device *Device)
-
 type MessageReceivedHandler func(message gocec.Message)
 
 type Cec struct {
 	connection *gocec.Connection
 	adapter gocec.Adapter
 
-	devices map[gocec.LogicalAddress]*Device
-
-	deviceAddedHandlers []DeviceAddedHandler
+	devices *DeviceRegistry
 	messageReceivedHandlers map[gocec.Opcode][]MessageReceivedHandler
 }
 
-func InitialiseCec(path string) (*Cec, error) {
+type CecDeviceDescription struct {
+	logicalAddress gocec.LogicalAddress
+	physicalAddress gocec.PhysicalAddress
+	vendor gocec.Vendor
+}
+
+
+func InitialiseCec(devices *DeviceRegistry, path string) (*Cec, error) {
 	config := gocec.NewConfiguration("cec2mqtt", false)
 
 	config.SetMonitorOnly(false)
 
 	cec := &Cec{
-		devices: make(map[gocec.LogicalAddress]*Device),
-		deviceAddedHandlers: make([]DeviceAddedHandler, 0),
+		devices: devices,
 		messageReceivedHandlers: make(map[gocec.Opcode][]MessageReceivedHandler),
 	}
 	config.SetLogCallback(cec.handleLogMessage)
@@ -58,10 +60,6 @@ func InitialiseCec(path string) (*Cec, error) {
 	cec.adapter = adapter
 
 	return cec, nil
-}
-
-func (cec *Cec) RegisterDeviceAddedHandler(handler DeviceAddedHandler) {
-	cec.deviceAddedHandlers = append(cec.deviceAddedHandlers, handler)
 }
 
 func (cec *Cec) RegisterMessageHandler(handler MessageReceivedHandler, opcodes ...gocec.Opcode) {
@@ -112,16 +110,15 @@ func (cec *Cec) GetDevice(address gocec.LogicalAddress) *Device {
 		return nil
 	}
 
-	device, ok := cec.devices[address]
-	if !ok {
-		device = NewDevice(address, cec)
-		cec.devices[address] = device
-
-		for _, handler := range cec.deviceAddedHandlers {
-			handler(device)
+	creator := func() *CecDeviceDescription {
+		return &CecDeviceDescription{
+			logicalAddress:  address,
+			physicalAddress: cec.connection.GetPhysicalAddress(address),
+			vendor:          cec.connection.GetVendor(address),
 		}
 	}
-	return device
+
+	return cec.devices.GetByCecDevice(address, creator)
 }
 
 func (cec *Cec) Transmit(message gocec.Message) {
