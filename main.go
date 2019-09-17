@@ -49,4 +49,5 @@ func main() {
 	fmt.Println("Cec2mqtt started")
 	<- done
 	fmt.Println("Exiting")
+	config.Save("/etc/cec2mqtt.yaml")
 }

@@ -12,13 +12,14 @@ type DeviceRegistry struct {
 
 	deviceAddedHandlers []DeviceAddedHandler
 
-	devicesMutex sync.Mutex
-	devices map[gocec.LogicalAddress]*Device
+	devicesMutex       sync.Mutex
+	devices            map[gocec.LogicalAddress]*Device
 	physicalAddressMap map[gocec.PhysicalAddress]*Device
 }
 
 type Device struct {
 	CecDevice *CecDeviceDescription
+	Config    *DeviceConfig
 
 	LogicalAddress gocec.LogicalAddress
 }
@@ -68,8 +69,11 @@ func (registry *DeviceRegistry) GetByCecDevice(address gocec.LogicalAddress, cre
 		}
 	}
 
+	deviceConfig := registry.confg.FindDevice(description.physicalAddress.String(), int(description.vendor), description.OSD)
+
 	device = &Device{
 		CecDevice:      description,
+		Config:         deviceConfig,
 		LogicalAddress: description.logicalAddress,
 	}
 

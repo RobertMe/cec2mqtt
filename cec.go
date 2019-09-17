@@ -20,6 +20,7 @@ type CecDeviceDescription struct {
 	logicalAddress gocec.LogicalAddress
 	physicalAddress gocec.PhysicalAddress
 	vendor gocec.Vendor
+	OSD string
 }
 
 
@@ -115,6 +116,7 @@ func (cec *Cec) GetDevice(address gocec.LogicalAddress) *Device {
 			logicalAddress:  address,
 			physicalAddress: cec.connection.GetPhysicalAddress(address),
 			vendor:          cec.connection.GetVendor(address),
+			OSD:			 cec.connection.GetOSDName(address),
 		}
 	}
 
