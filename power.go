@@ -14,10 +14,10 @@ type PowerBridge struct {
 	cec *Cec
 	mqtt *Mqtt
 
-	monitors map[gocec.LogicalAddress]*Monitor
+	monitors map[string]*Monitor
 	monitorsMutex sync.Mutex
 
-	states map[gocec.LogicalAddress]string
+	states map[string]string
 	statesMutex sync.Mutex
 }
 
@@ -26,8 +26,8 @@ func InitPowerBridge(devices *DeviceRegistry, cec *Cec, mqtt *Mqtt) {
 		cec:  cec,
 		mqtt: mqtt,
 
-		monitors: make(map[gocec.LogicalAddress]*Monitor),
-		states: make(map[gocec.LogicalAddress]string),
+		monitors: make(map[string]*Monitor),
+		states: make(map[string]string),
 	}
 
 	devices.RegisterDeviceAddedHandler(func(device *Device) {
@@ -35,8 +35,8 @@ func InitPowerBridge(devices *DeviceRegistry, cec *Cec, mqtt *Mqtt) {
 		bridge.monitorsMutex.Lock()
 		defer bridge.statesMutex.Unlock()
 		defer bridge.monitorsMutex.Unlock()
-		bridge.states[device.LogicalAddress] = "unknown"
-		bridge.monitors[device.LogicalAddress] = CreateMonitor(
+		bridge.states[device.Id] = "unknown"
+		bridge.monitors[device.Id] = CreateMonitor(
 			bridge.createStarter(device),
 			bridge.createRunner(device),
 			5 * time.Minute,
@@ -45,31 +45,35 @@ func InitPowerBridge(devices *DeviceRegistry, cec *Cec, mqtt *Mqtt) {
 		)
 	})
 
+	getDevice := func(address gocec.LogicalAddress) *Device {
+		return devices.FindByLogicalAddress(address)
+	}
+
 	cec.RegisterMessageHandler(func (message gocec.Message) {
-		bridge.setPowerStatus(message.Source(), bridge.cec.connection.GetPowerStatus(message.Source()))
+		bridge.setPowerStatus(getDevice(message.Source()), bridge.cec.connection.GetPowerStatus(message.Source()))
 	}, gocec.OpcodeReportPowerStatus)
 
 	cec.RegisterMessageHandler(func (message gocec.Message) {
-		bridge.MonitorPower(message.Source())
+		bridge.MonitorPower(getDevice(message.Source()).Id)
 	}, gocec.OpcodeSetSystemAudioMode)
 
 	cec.RegisterMessageHandler(func (message gocec.Message) {
-		for address, _ := range bridge.states {
-			bridge.MonitorPower(address)
+		for deviceId, _ := range bridge.states {
+			bridge.MonitorPower(deviceId)
 		}
 	}, gocec.OpcodeStandby, gocec.OpcodeActiveSource)
 }
 
-func (bridge *PowerBridge) MonitorPower(address gocec.LogicalAddress) {
+func (bridge *PowerBridge) MonitorPower(deviceId string) {
 	bridge.monitorsMutex.Lock()
 	defer bridge.monitorsMutex.Unlock()
 
-	if monitor, ok := bridge.monitors[address]; ok {
+	if monitor, ok := bridge.monitors[deviceId]; ok {
 		monitor.Reset()
 	}
 }
 
-func (bridge *PowerBridge) setPowerStatus(address gocec.LogicalAddress, status gocec.PowerStatus) {
+func (bridge *PowerBridge) setPowerStatus(device *Device, status gocec.PowerStatus) {
 	var value string
 	switch status {
 	case gocec.PowerStatusOn, gocec.PowerStatusTransitionToStandby:
@@ -82,12 +86,12 @@ func (bridge *PowerBridge) setPowerStatus(address gocec.LogicalAddress, status g
 
 	bridge.statesMutex.Lock()
 	defer bridge.statesMutex.Unlock()
-	if bridge.states[address] == value {
+	if bridge.states[device.Id] == value {
 		return
 	}
 
-	bridge.states[address]  = value
-	go bridge.mqtt.Publish(bridge.mqtt.BuildTopic(address, "power"), 0, false, value)
+	bridge.states[device.Id]  = value
+	go bridge.mqtt.Publish(bridge.mqtt.BuildTopic(device, "power"), 0, false, value)
 }
 
 func (bridge *PowerBridge) createStarter(device *Device) Starter {
@@ -106,6 +110,6 @@ func (bridge *PowerBridge) createStarter(device *Device) Starter {
 
 func (bridge *PowerBridge) createRunner(device *Device) Runner {
 	return func() {
-		bridge.setPowerStatus(device.LogicalAddress, bridge.cec.connection.GetPowerStatus(device.LogicalAddress))
+		bridge.setPowerStatus(device, bridge.cec.connection.GetPowerStatus(device.LogicalAddress))
 	}
 }

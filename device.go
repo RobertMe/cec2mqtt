@@ -18,6 +18,8 @@ type DeviceRegistry struct {
 }
 
 type Device struct {
+	Id string
+
 	CecDevice *CecDeviceDescription
 	Config    *DeviceConfig
 
@@ -72,6 +74,7 @@ func (registry *DeviceRegistry) GetByCecDevice(address gocec.LogicalAddress, cre
 	deviceConfig := registry.confg.FindDevice(description.physicalAddress.String(), int(description.vendor), description.OSD)
 
 	device = &Device{
+		Id:             deviceConfig.Id,
 		CecDevice:      description,
 		Config:         deviceConfig,
 		LogicalAddress: description.logicalAddress,

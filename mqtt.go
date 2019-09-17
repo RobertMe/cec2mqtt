@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/RobertMe/gocec"
 	"github.com/eclipse/paho.mqtt.golang"
 	"strings"
 )
@@ -50,9 +49,9 @@ func ConnectMqtt(config *Config) (*Mqtt, error) {
 	}, nil
 }
 
-func (mqtt *Mqtt) BuildTopic(address gocec.LogicalAddress, suffix string) string {
+func (mqtt *Mqtt) BuildTopic(device *Device, suffix string) string {
 	topic := strings.Builder{}
-	fmt.Fprintf(&topic,"%s/%d/%s", mqtt.config.BasePath, address, suffix)
+	fmt.Fprintf(&topic,"%s/%s/%s", mqtt.config.BasePath, device.Config.MqttTopic, suffix)
 	return topic.String()
 }
 
