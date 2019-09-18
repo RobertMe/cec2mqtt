@@ -87,6 +87,9 @@ func (config *Config) FindDevice(physicalAddress string, vendorId int, name stri
 	}
 
 	if option != nil {
+		option.PhysicalAddress = physicalAddress
+		option.VendorId = vendorId
+		option.OSD = name
 		return option
 	}
 
