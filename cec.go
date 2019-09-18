@@ -77,10 +77,14 @@ func (cec *Cec) RegisterMessageHandler(handler MessageReceivedHandler, opcodes .
 func (cec *Cec) Start() {
 	cec.connection.Open(cec.adapter)
 
+	adapterAddress, _ := cec.connection.GetAdapterAddress()
 	addresses := cec.connection.ActiveDevices()
 
 	for _, address := range addresses {
-		_ = cec.GetDevice(address)
+		// Don't register a device for the CEC adapter
+		if address != adapterAddress {
+			_ = cec.GetDevice(address)
+		}
 	}
 }
 
