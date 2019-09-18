@@ -21,15 +21,19 @@ type PowerBridge struct {
 	statesMutex sync.Mutex
 }
 
-func InitPowerBridge(devices *DeviceRegistry, cec *Cec, mqtt *Mqtt) {
+func InitPowerBridge(container *Container) {
+	cec := container.Get("cec").(*Cec)
 	bridge := PowerBridge{
 		cec:  cec,
-		mqtt: mqtt,
+		mqtt: container.Get("mqtt").(*Mqtt),
 
 		monitors: make(map[string]*Monitor),
 		states: make(map[string]string),
 	}
 
+	container.Register("bridge.power", bridge)
+
+	devices := container.Get("devices").(*DeviceRegistry)
 	devices.RegisterDeviceAddedHandler(func(device *Device) {
 		bridge.statesMutex.Lock()
 		bridge.monitorsMutex.Lock()

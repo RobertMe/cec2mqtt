@@ -7,12 +7,14 @@ import (
 	"syscall"
 )
 
-type Initializer func(deviceRegistry *DeviceRegistry, cec *Cec, mqtt *Mqtt)
+type Initializer func(container *Container)
 
 var initializers = make([]Initializer, 0)
 
 func main() {
 	fmt.Println("Starting cec2mqtt")
+
+	container := NewContainer()
 
 	config, err := ParseConfig("/etc/cec2mqtt.yaml")
 
@@ -20,7 +22,10 @@ func main() {
 		panic(err)
 	}
 
+	container.Register("config", config)
+
 	devices := NewDeviceRegistry(config)
+	container.Register("devices", devices)
 
 	mqtt, err := ConnectMqtt(config)
 
@@ -28,10 +33,18 @@ func main() {
 		panic(err)
 	}
 
-	cec, _ := InitialiseCec(devices, "")
+	container.Register("mqtt", mqtt)
+
+	cec, err := InitialiseCec(devices, "")
+
+	if nil != err {
+		panic(err)
+	}
+
+	container.Register("cec", cec)
 
 	for _, initializer := range initializers {
-		initializer(devices, cec, mqtt)
+		initializer(container)
 	}
 
 	cec.Start()
