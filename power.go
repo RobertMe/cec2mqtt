@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	initializers = append(initializers, InitPowerBridge)
+	RegisterInitializer(0, InitPowerBridge)
 }
 
 type PowerBridge struct {

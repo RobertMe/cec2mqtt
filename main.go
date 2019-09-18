@@ -4,12 +4,37 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sort"
 	"syscall"
 )
 
 type Initializer func(container *Container)
 
-var initializers = make([]Initializer, 0)
+var initializers = make(map[int][]Initializer, 0)
+
+func RegisterInitializer(priority int, initializer Initializer) {
+	if _, ok := initializers[priority]; ok {
+		initializers[priority] = append(initializers[priority], initializer)
+	} else {
+		initializers[priority] = []Initializer{initializer}
+	}
+}
+
+func runInitializers(container *Container) {
+	priorities := make([]int, len(initializers))
+	i := 0
+	for priority := range initializers {
+		priorities[i] = priority
+		i++
+	}
+
+	sort.Ints(priorities)
+	for i := len(priorities) - 1; i >= 0; i-- {
+		for _, initializer := range initializers[priorities[i]] {
+			initializer(container)
+		}
+	}
+}
 
 func main() {
 	fmt.Println("Starting cec2mqtt")
@@ -43,9 +68,7 @@ func main() {
 
 	container.Register("cec", cec)
 
-	for _, initializer := range initializers {
-		initializer(container)
-	}
+	runInitializers(container)
 
 	cec.Start()
 
