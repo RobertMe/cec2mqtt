@@ -50,7 +50,7 @@ func InitPowerBridge(devices *DeviceRegistry, cec *Cec, mqtt *Mqtt) {
 	}
 
 	cec.RegisterMessageHandler(func (message gocec.Message) {
-		bridge.setPowerStatus(getDevice(message.Source()), bridge.cec.connection.GetPowerStatus(message.Source()))
+		bridge.setPowerStatus(getDevice(message.Source()), gocec.PowerStatus(message[2]))
 	}, gocec.OpcodeReportPowerStatus)
 
 	cec.RegisterMessageHandler(func (message gocec.Message) {
