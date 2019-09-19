@@ -8,6 +8,10 @@ import (
 	"syscall"
 )
 
+const (
+	BuildVersion = "0.0.1"
+)
+
 type Initializer func(container *Container)
 
 var initializers = make(map[int][]Initializer, 0)

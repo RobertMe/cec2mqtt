@@ -4,6 +4,7 @@ import (
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
+	"strings"
 )
 
 type MqttConfig struct {
@@ -24,10 +25,15 @@ type DeviceConfig struct {
 	MqttTopic       string `yaml:"mqtt_topic"`
 }
 
-type Config struct {
-	Mqtt MqttConfig
+type HomeAssistantConfig struct {
+	Enable          bool   `yaml:"enable"`
+	DiscoveryPrefix string `yaml:"discovery_prefix"`
+}
 
-	Devices map[string]*DeviceConfig
+type Config struct {
+	Mqtt          MqttConfig
+	Devices       map[string]*DeviceConfig
+	HomeAssistant HomeAssistantConfig `yaml:"home_assistant"`
 }
 
 func ParseConfig(configPath string) (*Config, error) {
@@ -45,6 +51,12 @@ func ParseConfig(configPath string) (*Config, error) {
 
 	if config.Devices == nil {
 		config.Devices = make(map[string]*DeviceConfig)
+	}
+
+	if config.HomeAssistant.Enable && config.HomeAssistant.DiscoveryPrefix == "" {
+		config.HomeAssistant.DiscoveryPrefix = "homeassistant"
+	} else {
+		strings.Trim(config.HomeAssistant.DiscoveryPrefix, "/")
 	}
 
 	return &config, nil

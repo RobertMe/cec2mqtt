@@ -49,6 +49,12 @@ func InitPowerBridge(container *Container) {
 		)
 	})
 
+	if haBridge := container.Get("home-assistant").(*HomeAssistantBridge); haBridge != nil {
+		devices.RegisterDeviceAddedHandler(func(device *Device) {
+			haBridge.RegisterSwitch(device, "power")
+		})
+	}
+
 	getDevice := func(address gocec.LogicalAddress) *Device {
 		return devices.FindByLogicalAddress(address)
 	}
