@@ -20,6 +20,8 @@ COPY . .
 
 FROM dev AS builder
 
+RUN apk add git
+
 RUN go get -d -v .
 RUN go build -v -o cec2mqtt
 
