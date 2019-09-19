@@ -28,7 +28,7 @@ RUN go build -v -o cec2mqtt
 FROM alpine
 ARG PLATFORM
 
-RUN apk add p8-platform
+RUN apk add p8-platform eudev
 RUN if [ "$PLATFORM" == "rpi" ] ; then apk add raspberrypi-libs ; fi
 
 COPY --from=builder /usr/lib/libcec.so* /usr/lib/
