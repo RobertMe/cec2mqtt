@@ -1,0 +1,31 @@
+language: minimal
+
+sudo: required
+
+addons:
+  apt:
+    packages:
+      - docker-ce
+
+services:
+  - docker
+
+before_script:
+  - "echo '{\"experimental\": true}' | sudo tee /etc/docker/daemon.json"
+  - sudo service docker restart
+
+jobs:
+  include:
+    - stage: build
+      script: make -j2 build
+      if: tag IS NOT present AND ( branch != "master" OR type != "push" )
+    - stage: release
+      script:
+        - echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USERNAME" --password-stdin
+        - make -j2 release VERSION="$TRAVIS_TAG"
+      if: tag IS present AND tag =~ ^v\d+\.\d+(\.\d+)?(-\S*)?$
+    - stage: release-dev
+      script:
+        - echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USERNAME" --password-stdin
+        - make -j2 push VERSION=dev
+      if: branch = "master" AND type = "push"
