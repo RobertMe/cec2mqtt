@@ -16,9 +16,10 @@ ADD https://github.com/Pulse-Eight/libcec/archive/libcec-${LIBCEC_VERSION}.tar.g
 RUN ./install-libcec.$PLATFORM
 
 WORKDIR /go/src/cec2mqtt
-COPY . .
 
 FROM dev AS builder
+
+COPY *.go ./
 
 RUN apk add git
 
