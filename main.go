@@ -45,7 +45,7 @@ func main() {
 
 	container := NewContainer()
 
-	config, err := ParseConfig("/etc/cec2mqtt.yaml")
+	config, err := ParseConfig("/data/cec2mqtt/config.yaml")
 
 	if nil != err {
 		panic(err)
