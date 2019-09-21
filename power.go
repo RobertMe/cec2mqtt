@@ -49,7 +49,7 @@ func InitPowerBridge(container *Container) {
 		)
 	})
 
-	if haBridge := container.Get("home-assistant").(*HomeAssistantBridge); haBridge != nil {
+	if haBridge, ok := container.Get("home-assistant").(*HomeAssistantBridge); ok {
 		devices.RegisterDeviceAddedHandler(func(device *Device) {
 			haBridge.RegisterSwitch(device, "power")
 		})
