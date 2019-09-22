@@ -45,7 +45,7 @@ func main() {
 
 	container := NewContainer()
 
-	config, err := ParseConfig("/data/cec2mqtt/config.yaml")
+	config, err := ParseConfig("/data/cec2mqtt/")
 
 	if nil != err {
 		panic(err)
@@ -53,7 +53,7 @@ func main() {
 
 	container.Register("config", config)
 
-	devices := NewDeviceRegistry(config)
+	devices := NewDeviceRegistry("/data/cec2mqtt/")
 	container.Register("devices", devices)
 
 	mqtt, err := ConnectMqtt(config)
@@ -89,5 +89,6 @@ func main() {
 	fmt.Println("Cec2mqtt started")
 	<- done
 	fmt.Println("Exiting")
-	config.Save("/etc/cec2mqtt.yaml")
+	config.Save("/data/cec2mqtt/")
+	devices.Save("/data/cec2mqtt")
 }
