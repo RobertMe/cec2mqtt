@@ -23,9 +23,10 @@ type PowerBridge struct {
 
 func InitPowerBridge(container *Container) {
 	cec := container.Get("cec").(*Cec)
+	mqtt := container.Get("mqtt").(*Mqtt)
 	bridge := PowerBridge{
 		cec:  cec,
-		mqtt: container.Get("mqtt").(*Mqtt),
+		mqtt: mqtt,
 
 		monitors: make(map[string]*Monitor),
 		states: make(map[string]string),
@@ -47,6 +48,15 @@ func InitPowerBridge(container *Container) {
 			5 * time.Second,
 			time.Minute,
 		)
+
+		mqtt.Subscribe(mqtt.BuildTopic(device, "power/set"), 0, func(payload []byte) {
+			switch string(payload) {
+			case "on":
+				cec.connection.PowerOnDevice(device.LogicalAddress)
+			case "off":
+				cec.connection.StandByDevice(device.LogicalAddress)
+			}
+		})
 	})
 
 	if haBridge, ok := container.Get("home-assistant").(*HomeAssistantBridge); ok {
