@@ -10,22 +10,80 @@ addons:
 services:
   - docker
 
+env:
+  - ARCH=amd64 HARDWARE=default PLATFORM=amd64
+  - ARCH=arm32v7 HARDWARE=default PLATFORM=arm32/v7
+  - ARCH=arm64v8 HARDWARE=default PLATFORM=arm32/v7
+  - ARCH=arm32v7 HARDWARE=rpi PLATFORM=arm32/v7
+  - ARCH=arm64v8 HARDWARE=rpi PLATFORM=arm32/v7
+
 before_script:
   - "echo '{\"experimental\": true}' | sudo tee /etc/docker/daemon.json"
   - sudo service docker restart
+  - docker run --rm --privileged multiarch/qemu-user-static:register --reset
+  - echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USERNAME" --password-stdin
+
+script:
+  - |
+    set -e
+    [[ "$TRAVIS_TAG" == "" ]] && VERSION=dev || VERSION=$TRAVIS_TAG
+    [[ "$HARDWARE" == "default" ]] && TAG="${ARCH}" || TAG="${ARCH}-${HARDWARE}"
+
+    docker pull robertme/cec2mqtt:${TAG}-cec || true
+
+    docker build . --platform=linux/${PLATFORM} --build-arg PLATFORM="${HARDWARE}" -f docker/Dockerfile.${ARCH} --cache-from robertme/cec2mqtt:${TAG}-cec -t robertme/cec2mqtt:${TAG}-${VERSION}
+
+    if [[ $TRAVIS_TAG != "" || $TRAVIS_BRANCH == "master" ]]; then
+      docker push robertme/cec2mqtt:${TAG}-${VERSION}
+
+      docker build . --target dev --platform=linux/${PLATFORM} --build-arg PLATFORM="${HARDWARE}" -f docker/Dockerfile.${ARCH} --cache-from robertme/cec2mqtt:${TAG}-cec -t robertme/cec2mqtt:${TAG}-cec
+      docker push robertme/cec2mqtt:${TAG}-cec
+    fi
 
 jobs:
   include:
-    - stage: build
-      script: make -j2 build
-      if: tag IS NOT present AND ( branch != "master" OR type != "push" )
-    - stage: release
-      script:
-        - echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USERNAME" --password-stdin
-        - make -j2 release VERSION="$TRAVIS_TAG"
-      if: tag IS present AND tag =~ ^v\d+\.\d+(\.\d+)?(-\S*)?$
-    - stage: release-dev
-      script:
-        - echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USERNAME" --password-stdin
-        - make -j2 push VERSION=dev
-      if: branch = "master" AND type = "push"
+    - stage: deploy
+      script: |
+        set -e
+        export DOCKER_CLI_EXPERIMENTAL=enabled
+        [[ "$TRAVIS_TAG" == "" ]] && VERSION=dev || VERSION=$TRAVIS_TAG
+        docker pull robertme/cec2mqtt:amd64-${VERSION}
+        docker pull robertme/cec2mqtt:arm32v7-${VERSION}
+        docker pull robertme/cec2mqtt:arm64v8-${VERSION}
+
+        docker manifest create robertme/cec2mqtt:${VERSION} robertme/cec2mqtt:amd64-${VERSION} robertme/cec2mqtt:arm32v7-${VERSION} robertme/cec2mqtt:arm64v8-${VERSION}
+        docker manifest annotate robertme/cec2mqtt:${VERSION} robertme/cec2mqtt:arm32v7-${VERSION} --os linux --arch arm --variant 7
+        docker manifest annotate robertme/cec2mqtt:${VERSION} robertme/cec2mqtt:arm64v8-${VERSION} --os linux --arch arm64 --variant 8
+        docker manifest inspect robertme/cec2mqtt:${VERSION}
+        docker manifest push --purge robertme/cec2mqtt:${VERSION}
+
+        docker pull robertme/cec2mqtt:arm32v7-rpi-${VERSION}
+        docker pull robertme/cec2mqtt:arm64v8-rpi-${VERSION}
+
+        docker manifest create robertme/cec2mqtt:rpi-${VERSION} robertme/cec2mqtt:arm32v7-rpi-${VERSION} robertme/cec2mqtt:arm64v8-rpi-${VERSION}
+        docker manifest annotate robertme/cec2mqtt:rpi-${VERSION} robertme/cec2mqtt:arm32v7-rpi-${VERSION} --os linux --arch arm --variant 7
+        docker manifest annotate robertme/cec2mqtt:rpi-${VERSION} robertme/cec2mqtt:arm64v8-rpi-${VERSION} --os linux --arch arm64 --variant 8
+        docker manifest inspect robertme/cec2mqtt:rpi-${VERSION}
+        docker manifest push --purge robertme/cec2mqtt:rpi-${VERSION}
+
+        if [[ $TRAVIS_TAG != "" ]]; then
+          docker tag robertme/cec2mqtt:amd64-${VERSION} robertme/cec2mqtt:amd64
+          docker tag robertme/cec2mqtt:arm32v7-${VERSION} robertme/cec2mqtt:arm32v7
+          docker tag robertme/cec2mqtt:arm64v8-${VERSION} robertme/cec2mqtt:arm64v8
+
+          docker manifest create robertme/cec2mqtt:latest robertme/cec2mqtt:amd64 robertme/cec2mqtt:arm32v7 robertme/cec2mqtt:arm64v8
+          docker manifest annotate robertme/cec2mqtt:latest robertme/cec2mqtt:arm32v7 --os linux --arch arm --variant 7
+          docker manifest annotate robertme/cec2mqtt:latest robertme/cec2mqtt:arm64v8 --os linux --arch arm64 --variant 8
+          docker manifest inspect robertme/cec2mqtt:latest
+          docker manifest push --purge robertme/cec2mqtt:latest
+
+          docker tag robertme/cec2mqtt:arm32v7-rpi-${VERSION} robertme/cec2mqtt:arm32v7-rpi
+          docker tag robertme/cec2mqtt:arm64v8-rpi-${VERSION} robertme/cec2mqtt:arm64v8-rpi
+
+          docker manifest create robertme/cec2mqtt:rpi robertme/cec2mqtt:arm32v7-rpi robertme/cec2mqtt:arm64v8-rpi
+          docker manifest annotate robertme/cec2mqtt:rpi robertme/cec2mqtt:arm32v7-rpi --os linux --arch arm --variant 7
+          docker manifest annotate robertme/cec2mqtt:rpi robertme/cec2mqtt:arm64v8-rpi --os linux --arch arm64 --variant 8
+          docker manifest inspect robertme/cec2mqtt:rpi
+          docker manifest push --purge robertme/cec2mqtt:rpi
+        fi
+        export DOCKER_CLI_EXPERIMENTAL=disabled

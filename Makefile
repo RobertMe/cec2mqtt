@@ -16,14 +16,21 @@ build-arm64v8-default: crosscompile
 .PHONE: build-default
 build-default: build-amd64-default build-arm32v7-default build-arm64v8-default
 
-.PHONY: push-default
-push-default: export DOCKER_CLI_EXPERIMENTAL = enabled
-push-default: build-default
-	# Images need to be pushed before manifest can be created
+.PHONY: push-amd64-default
+push-amd64-default: build-amd64-default
 	docker push robertme/cec2mqtt:${VERSION}
+
+.PHONY: push-arm32v7-default
+push-arm32v7-default: build-arm32v7-default
 	docker push robertme/cec2mqtt:arm32v7-${VERSION}
+
+.PHONY: push-arm64v8-default
+push-arm64v8-default: build-arm64v8-default
 	docker push robertme/cec2mqtt:arm64v8-${VERSION}
 
+.PHONY: push-default
+push-default: export DOCKER_CLI_EXPERIMENTAL = enabled
+push-default: push-amd64-default push-arm32v7-default push-arm64v8-default
 	docker manifest create robertme/cec2mqtt:${VERSION} robertme/cec2mqtt:${VERSION} robertme/cec2mqtt:arm32v7-${VERSION} robertme/cec2mqtt:arm64v8-${VERSION}
 	docker manifest annotate robertme/cec2mqtt:${VERSION} robertme/cec2mqtt:arm32v7-${VERSION} --os linux --arch arm --variant 7
 	docker manifest annotate robertme/cec2mqtt:${VERSION} robertme/cec2mqtt:arm64v8-${VERSION} --os linux --arch arm64 --variant 8
