@@ -11,6 +11,8 @@ type Mqtt struct {
 	config *MqttConfig
 }
 
+type MessageHandler func (payload []byte)
+
 func ConnectMqtt(config *Config) (*Mqtt, error) {
 	mqttConfig := config.Mqtt
 	options := mqtt.NewClientOptions()
@@ -57,4 +59,10 @@ func (mqtt *Mqtt) BuildTopic(device *Device, suffix string) string {
 
 func (mqtt *Mqtt) Publish(topic string, qos byte, retained bool, payload interface{}) {
 	mqtt.client.Publish(topic, qos, retained, payload)
+}
+
+func (m *Mqtt) Subscribe(topic string, qos byte, callback MessageHandler) {
+	m.client.Subscribe(topic, qos, func(_ mqtt.Client, message mqtt.Message) {
+		callback(message.Payload())
+	})
 }
