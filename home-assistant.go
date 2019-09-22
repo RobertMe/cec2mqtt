@@ -36,6 +36,7 @@ func (bridge *HomeAssistantBridge) RegisterSwitch(device *Device, property strin
 	fmt.Fprintf(&topic, "%s/switch/%s/%s/config", bridge.discoveryPrefix, device.Id, property)
 
 	config := bridge.createConfig(device, property)
+	config["command_topic"] = bridge.mqtt.BuildTopic(device, property + "/set")
 
 	if encoded, err := json.Marshal(config); err == nil {
 		bridge.mqtt.Publish(topic.String(), 0, true, encoded)
