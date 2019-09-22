@@ -1,10 +1,12 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
 	"sort"
+	"strings"
 	"syscall"
 )
 
@@ -41,11 +43,19 @@ func runInitializers(container *Container) {
 }
 
 func main() {
+	var dataDir string
+
+	flag.StringVar(&dataDir, "data-dir", "/data/cec2mqtt/", "Sets the directory where the data, including config, files are stored")
+
+	flag.Parse()
+
+	dataDir = strings.TrimRight(dataDir, "/") + "/"
+
 	fmt.Println("Starting cec2mqtt")
 
 	container := NewContainer()
 
-	config, err := ParseConfig("/data/cec2mqtt/")
+	config, err := ParseConfig(dataDir)
 
 	if nil != err {
 		panic(err)
@@ -53,7 +63,7 @@ func main() {
 
 	container.Register("config", config)
 
-	devices := NewDeviceRegistry("/data/cec2mqtt/")
+	devices := NewDeviceRegistry(dataDir)
 	container.Register("devices", devices)
 
 	mqtt, err := ConnectMqtt(config)
@@ -89,6 +99,6 @@ func main() {
 	fmt.Println("Cec2mqtt started")
 	<- done
 	fmt.Println("Exiting")
-	config.Save("/data/cec2mqtt/")
-	devices.Save("/data/cec2mqtt")
+	config.Save(dataDir)
+	devices.Save(dataDir)
 }
