@@ -42,6 +42,12 @@ func InitAcitveSourceBridge(container *Container) {
 		bridge.devices[device.LogicalAddress] = device
 	})
 
+	if haBridge, ok := container.Get("home-assistant").(*HomeAssistantBridge); ok {
+		devices.RegisterDeviceAddedHandler(func(device *Device) {
+			haBridge.RegisterBinarySensor(device, "is_active_source")
+		})
+	}
+
 	cec.RegisterMessageHandler(func(message gocec.Message) {
 		bridge.monitor.Reset()
 	}, gocec.OpcodeActiveSource, gocec.OpcodeSetStreamPath)
