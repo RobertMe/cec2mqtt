@@ -44,7 +44,19 @@ func InitAcitveSourceBridge(container *Container) {
 
 	cec.RegisterMessageHandler(func(message gocec.Message) {
 		bridge.monitor.Reset()
-	}, gocec.OpcodeActiveSource, gocec.OpcodeSetStreamPath, gocec.OpcodeReportPowerStatus)
+	}, gocec.OpcodeActiveSource, gocec.OpcodeSetStreamPath)
+
+	cec.RegisterMessageHandler(func(message gocec.Message) {
+		bridge.monitor.Reset()
+
+		if bridge.activeSource == nil ||  message.Source() != bridge.activeSource.LogicalAddress {
+			return
+		}
+
+		if gocec.PowerStatus(message.Parameters()[0]) == gocec.PowerStatusStandBy {
+			bridge.updateActiveSource(nil)
+		}
+	}, gocec.OpcodeReportPowerStatus)
 
 	cec.RegisterMessageHandler(func(message gocec.Message) {
 		if message.Source() == gocec.DeviceTV {
@@ -62,6 +74,12 @@ func (bridge *ActiveSourceBridge) updateActiveSource(newSource *Device) {
 
 	if newSource == nil && bridge.activeSource == nil {
 		return
+	}
+
+	if newSource != nil {
+		if bridge.cec.connection.GetPowerStatus(newSource.LogicalAddress) == gocec.PowerStatusStandBy {
+			newSource = nil
+		}
 	}
 
 	mqtt := bridge.mqtt
