@@ -58,7 +58,7 @@ func (bridge *HomeAssistantBridge) createConfig(device *Device, property string)
 	config := map[string]interface{}{
 		"state_topic": bridge.mqtt.BuildTopic(device, property),
 		"name":        device.CecDevice.OSD + "_" + property,
-		"unique_id":   device.Id + "_" + property + "_" + bridge.config.Mqtt.BasePath,
+		"unique_id":   device.Id + "_" + property + "_" + bridge.config.Mqtt.BaseTopic,
 		"availability_topic": bridge.config.Mqtt.StateTopic,
 	}
 

@@ -13,7 +13,7 @@ type MqttConfig struct {
 	StateTopic   string `yaml:"state_topic"`
 	BirthMessage string `yaml:"birth_message"`
 	WillMessage  string `yaml:"will_message"`
-	BasePath     string `yaml:"base_path"`
+	BaseTopic    string `yaml:"base_topic"`
 }
 
 type HomeAssistantConfig struct {

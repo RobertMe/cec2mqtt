@@ -53,7 +53,7 @@ func ConnectMqtt(config *Config) (*Mqtt, error) {
 
 func (mqtt *Mqtt) BuildTopic(device *Device, suffix string) string {
 	topic := strings.Builder{}
-	fmt.Fprintf(&topic,"%s/%s/%s", mqtt.config.BasePath, device.Config.MqttTopic, suffix)
+	fmt.Fprintf(&topic,"%s/%s/%s", mqtt.config.BaseTopic, device.Config.MqttTopic, suffix)
 	return topic.String()
 }
 
