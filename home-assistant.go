@@ -39,6 +39,8 @@ func (bridge *HomeAssistantBridge) RegisterSwitch(device *Device, property strin
 
 	config := bridge.createConfig(device, property)
 	config["command_topic"] = bridge.mqtt.BuildTopic(device, property + "/set")
+	config["payload_on"] = "on"
+	config["payload_off"] = "off"
 
 	encoded, err := json.Marshal(config)
 	if err != nil {
@@ -66,6 +68,8 @@ func (bridge *HomeAssistantBridge) RegisterBinarySensor(device *Device, property
 	fmt.Fprintf(&topic, "%s/binary_sensor/%s/%s/config", bridge.discoveryPrefix, device.Id, property)
 
 	config := bridge.createConfig(device, property)
+	config["payload_on"] = "on"
+	config["payload_off"] = "off"
 
 	encoded, err := json.Marshal(config)
 	if err != nil {
@@ -90,10 +94,12 @@ func (bridge *HomeAssistantBridge) RegisterBinarySensor(device *Device, property
 
 func (bridge *HomeAssistantBridge) createConfig(device *Device, property string) map[string]interface{} {
 	config := map[string]interface{}{
-		"state_topic": bridge.mqtt.BuildTopic(device, property),
-		"name":        device.CecDevice.OSD + "_" + property,
-		"unique_id":   device.Id + "_" + property + "_" + bridge.config.Mqtt.BaseTopic,
-		"availability_topic": bridge.config.Mqtt.StateTopic,
+		"state_topic":           bridge.mqtt.BuildTopic(device, property),
+		"name":                  device.CecDevice.OSD + "_" + property,
+		"unique_id":             device.Id + "_" + property + "_" + bridge.config.Mqtt.BaseTopic,
+		"availability_topic":    bridge.config.Mqtt.StateTopic,
+		"payload_available":     bridge.config.Mqtt.BirthMessage,
+		"payload_not_available": bridge.config.Mqtt.WillMessage,
 	}
 
 	deviceConfig := map[string]interface{}{
