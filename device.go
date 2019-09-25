@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/RobertMe/gocec"
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"sync"
@@ -49,16 +50,23 @@ func NewDeviceRegistry(dataDirectory string) *DeviceRegistry {
 }
 
 func loadDevicesFromConfig(dataDirectory string) (devices map[string]*DeviceConfig) {
+	logContext := log.WithFields(log.Fields{
+		"config_file": dataDirectory + "devices.yaml",
+	})
+	logContext.Info("Reading devices from config file")
+
 	devices = make(map[string]*DeviceConfig)
 	data, err := ioutil.ReadFile(dataDirectory + "devices.yaml")
 	if err != nil {
-		// Log
+		logContext.Info("Devices configuration file does not exist yet")
 		return
 	}
 
 	err = yaml.Unmarshal(data, &devices)
 	if err != nil {
-		// Log
+		logContext.WithFields(log.Fields{
+			"error": err,
+		}).Error("Devices configuration file could not be parsed as valid YAML")
 		return
 	}
 
@@ -66,16 +74,25 @@ func loadDevicesFromConfig(dataDirectory string) (devices map[string]*DeviceConf
 }
 
 func (registry *DeviceRegistry) RegisterDeviceAddedHandler(handler DeviceAddedHandler) {
+	log.Trace("Registering device added handler")
 	registry.deviceAddedHandlers = append(registry.deviceAddedHandlers, handler)
 }
 
 func (registry *DeviceRegistry) FindByLogicalAddress(address gocec.LogicalAddress) *Device {
+	logContext := log.WithFields(log.Fields{
+		"logical_address": address,
+	})
 	registry.devicesMutex.Lock()
 	defer registry.devicesMutex.Unlock()
 	device, ok := registry.devices[address]
 	if !ok {
+		logContext.Info("Could not find device by logical address")
 		return nil
 	}
+
+	logContext.WithFields(log.Fields{
+		"device.id": device.Id,
+	}).Debug("Found device by logical address")
 
 	return device
 }
@@ -85,6 +102,12 @@ func (registry *DeviceRegistry) GetByCecDevice(address gocec.LogicalAddress, cre
 
 	if device, ok := registry.devices[address]; ok {
 		registry.devicesMutex.Unlock()
+
+		log.WithFields(log.Fields{
+			"logical_address": address,
+			"device.id": device.Config.Id,
+		}).Trace("Found device by logical address")
+
 		return device
 	}
 
@@ -94,7 +117,17 @@ func (registry *DeviceRegistry) GetByCecDevice(address gocec.LogicalAddress, cre
 	if ok {
 		if device.CecDevice.physicalAddress == description.physicalAddress &&
 			device.CecDevice.vendor == description.vendor {
+			registry.devices[address] = device
 			registry.devicesMutex.Unlock()
+
+			log.WithFields(log.Fields{
+				"logical_address": address,
+				"physical_address": description.physicalAddress,
+				"vendor_id": description.vendor,
+				"description": description,
+				"device.id": device.Config.Id,
+			}).Debug("Found device by physical address and vendor")
+
 			return device
 		}
 	}
@@ -113,6 +146,14 @@ func (registry *DeviceRegistry) GetByCecDevice(address gocec.LogicalAddress, cre
 
 	registry.devicesMutex.Unlock()
 
+	log.WithFields(log.Fields{
+		"logical_address": address,
+		"physical_address": description.physicalAddress,
+		"vendor": description.vendor,
+		"description": description,
+		"device.id": device.Config.Id,
+	}).Debug("Adding new device")
+
 	for _, handler := range registry.deviceAddedHandlers {
 		handler(device)
 	}
@@ -121,32 +162,59 @@ func (registry *DeviceRegistry) GetByCecDevice(address gocec.LogicalAddress, cre
 }
 
 func (registry *DeviceRegistry) FindDevice(physicalAddress string, vendorId int, name string) *DeviceConfig {
+	logContext := log.WithFields(log.Fields{
+		"physical_address": physicalAddress,
+		"vendor_id": vendorId,
+		"name": name,
+	})
+	logContext.Trace("Searching device in config")
 	var option *DeviceConfig
 
 	for _, device := range registry.configDevices {
+		deviceLogContext := logContext.WithFields(log.Fields{
+			"device.id": device.Id,
+			"device.physical_address": device.PhysicalAddress,
+			"device.vendor_id": device.VendorId,
+			"device.osd": device.OSD,
+		})
+
 		if device.PhysicalAddress == physicalAddress && device.VendorId == vendorId {
 			if device.OSD == name {
 				// Exact match so must be it
+
+				deviceLogContext.Info("Matched exact device from config")
+
 				return device
 			}
 
 			if option != nil {
+				deviceLogContext.Debug("Multiple possible matches are found. Skipping.")
 				option = nil
 				break
 			}
 
+			deviceLogContext.Debug("Found possible match")
 			option = device
 		} else if device.VendorId == vendorId && device.OSD == name {
 			if option != nil {
+				deviceLogContext.Debug("Multiple possible matches are found. Skipping.")
 				option = nil
 				break
 			}
 
+			deviceLogContext.Debug("Found possible match")
 			option = device
 		}
 	}
 
 	if option != nil {
+		logContext.WithFields(log.Fields{
+			"device.id": option.Id,
+			"device.physical_address": option.PhysicalAddress,
+			"device.vendor_id": option.VendorId,
+			"device.osd": option.OSD,
+		}).Info("Found device in config")
+
 		option.PhysicalAddress = physicalAddress
 		option.VendorId = vendorId
 		option.OSD = name
@@ -170,6 +238,14 @@ func (registry *DeviceRegistry) FindDevice(physicalAddress string, vendorId int,
 		MqttTopic:       name,
 	}
 
+	log.WithFields(log.Fields{
+		"device.id": device.Id,
+		"device.physical_address": device.PhysicalAddress,
+		"device.vendor_id": device.VendorId,
+		"device.osd": device.OSD,
+		"device.mqtt_topic": device.MqttTopic,
+	}).Info("Created new device")
+
 	registry.configDevices[id] = device
 
 	return device
@@ -179,8 +255,21 @@ func (registry *DeviceRegistry) Save(configPath string) error {
 	data, err := yaml.Marshal(registry.configDevices)
 
 	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Error("Failed to convert devices configuration into YAML")
 		return err
 	}
 
-	return ioutil.WriteFile(configPath + "devices.yaml", data, 0644)
+	err = ioutil.WriteFile(configPath + "devices.yaml", data, 0644)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+			"config_file": configPath + "devices.yaml",
+		}).Error("Failed to save devices configuration to file")
+
+		return err
+	}
+
+	return nil
 }

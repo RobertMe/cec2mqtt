@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/eclipse/paho.mqtt.golang"
+	log "github.com/sirupsen/logrus"
 	"strings"
 )
 
@@ -59,10 +60,24 @@ func (mqtt *Mqtt) BuildTopic(device *Device, suffix string) string {
 
 func (mqtt *Mqtt) Publish(topic string, qos byte, retained bool, payload interface{}) {
 	mqtt.client.Publish(topic, qos, retained, payload)
+	log.WithFields(log.Fields{
+		"topic": topic,
+		"qos": qos,
+		"retained": retained,
+		"payload": payload,
+	}).Trace("Published MQTT message")
 }
 
 func (m *Mqtt) Subscribe(topic string, qos byte, callback MessageHandler) {
 	m.client.Subscribe(topic, qos, func(_ mqtt.Client, message mqtt.Message) {
+		log.WithFields(log.Fields{
+			"topic": message.Topic(),
+			"payload": message.Payload(),
+		}).Trace("Handling incoming MQTT message")
 		callback(message.Payload())
 	})
+	log.WithFields(log.Fields{
+		"topic": topic,
+		"qos": qos,
+	}).Trace("Subscribed to MQTT topic")
 }

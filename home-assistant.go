@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"strings"
 )
 
@@ -19,6 +20,7 @@ type HomeAssistantBridge struct {
 func InitHomeAssistantBridge(container *Container) {
 	config := container.Get("config").(*Config)
 	if !config.HomeAssistant.Enable {
+		log.Info("Home assistant integration is not enabled, skipping")
 		return
 	}
 
@@ -38,9 +40,25 @@ func (bridge *HomeAssistantBridge) RegisterSwitch(device *Device, property strin
 	config := bridge.createConfig(device, property)
 	config["command_topic"] = bridge.mqtt.BuildTopic(device, property + "/set")
 
-	if encoded, err := json.Marshal(config); err == nil {
-		bridge.mqtt.Publish(topic.String(), 0, true, encoded)
+	encoded, err := json.Marshal(config)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"device.id": device.Config.Id,
+			"property": property,
+			"config": config,
+			"error": err,
+		}).Error("Failed to convert switch configuration to JSON")
+
+		return
 	}
+
+	log.WithFields(log.Fields{
+		"device.id": device.Config.Id,
+		"property": property,
+		"config": string(encoded),
+	}).Info("Registering switch in Home Assistant")
+
+	bridge.mqtt.Publish(topic.String(), 0, true, encoded)
 }
 
 func (bridge *HomeAssistantBridge) RegisterBinarySensor(device *Device, property string) {
@@ -49,9 +67,25 @@ func (bridge *HomeAssistantBridge) RegisterBinarySensor(device *Device, property
 
 	config := bridge.createConfig(device, property)
 
-	if encoded, err := json.Marshal(config); err == nil {
-		bridge.mqtt.Publish(topic.String(), 0, true, encoded)
+	encoded, err := json.Marshal(config)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"device.id": device.Config.Id,
+			"property": property,
+			"config": config,
+			"error": err,
+		}).Error("Failed to convert binary sensor configuration to JSON")
+
+		return
 	}
+
+	log.WithFields(log.Fields{
+		"device.id": device.Config.Id,
+		"property": property,
+		"config": string(encoded),
+	}).Info("Registering binary switch in Home Assistant")
+
+	bridge.mqtt.Publish(topic.String(), 0, true, encoded)
 }
 
 func (bridge *HomeAssistantBridge) createConfig(device *Device, property string) map[string]interface{} {

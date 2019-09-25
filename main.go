@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
 	"sort"
@@ -43,22 +43,49 @@ func runInitializers(container *Container) {
 }
 
 func main() {
-	var dataDir string
 
+	var dataDir string
 	flag.StringVar(&dataDir, "data-dir", "/data/cec2mqtt/", "Sets the directory where the data, including config, files are stored")
+
+	var logLevel string
+	flag.StringVar(&logLevel, "log-level", "info", "Sets the log level. Options are panic, fatal, error, warning, info, debug, trace")
+
+	var logCecMessages bool
+	flag.BoolVar(&logCecMessages, "log-cec-messages", false, "Enables logging of the libcec log")
 
 	flag.Parse()
 
-	dataDir = strings.TrimRight(dataDir, "/") + "/"
+	switch logLevel {
+	case "panic":
+		log.SetLevel(log.PanicLevel)
+	case "fatal":
+		log.SetLevel(log.FatalLevel)
+	case "error":
+		log.SetLevel(log.ErrorLevel)
+	case "warning":
+		log.SetLevel(log.WarnLevel)
+	case "info":
+		log.SetLevel(log.InfoLevel)
+	case "debug":
+		log.SetLevel(log.DebugLevel)
+	case "trace":
+		log.SetLevel(log.TraceLevel)
+	default:
+		log.SetLevel(log.InfoLevel)
+	}
 
-	fmt.Println("Starting cec2mqtt")
+	log.WithField("version", BuildVersion).Info("Starting Cec2Mqtt")
+
+	dataDir = strings.TrimRight(dataDir, "/") + "/"
 
 	container := NewContainer()
 
 	config, err := ParseConfig(dataDir)
 
 	if nil != err {
-		panic(err)
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Fatal("Error reading configuration")
 	}
 
 	container.Register("config", config)
@@ -69,15 +96,21 @@ func main() {
 	mqtt, err := ConnectMqtt(config)
 
 	if nil != err {
-		panic(err)
+		log.WithFields(log.Fields{
+			"config": config.Mqtt,
+			"error": err,
+		}).Fatal("Failed to connect to MQTT broker")
 	}
 
 	container.Register("mqtt", mqtt)
 
 	cec, err := InitialiseCec(devices, "")
+	cec.LibCecLoggingEnabled = logCecMessages
 
 	if nil != err {
-		panic(err)
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Fatal("Failed to setup CEC connection")
 	}
 
 	container.Register("cec", cec)
@@ -96,9 +129,9 @@ func main() {
 		done <- true
 	}()
 
-	fmt.Println("Cec2mqtt started")
+	log.Info("Cec2Mqtt started")
 	<- done
-	fmt.Println("Exiting")
+	log.Info("Exiting")
 	config.Save(dataDir)
 	devices.Save(dataDir)
 }

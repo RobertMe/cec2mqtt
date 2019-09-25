@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"github.com/RobertMe/gocec"
+	log "github.com/sirupsen/logrus"
 	"strings"
 )
 
@@ -10,10 +11,11 @@ type MessageReceivedHandler func(message gocec.Message)
 
 type Cec struct {
 	connection *gocec.Connection
-	adapter gocec.Adapter
+	adapter    gocec.Adapter
 
-	devices *DeviceRegistry
+	devices                 *DeviceRegistry
 	messageReceivedHandlers map[gocec.Opcode][]MessageReceivedHandler
+	LibCecLoggingEnabled    bool
 }
 
 type CecDeviceDescription struct {
@@ -42,8 +44,18 @@ func InitialiseCec(devices *DeviceRegistry, path string) (*Cec, error) {
 
 	var adapter gocec.Adapter
 	adapters := connection.FindAdapters()
+
+	log.WithFields(log.Fields{
+		"adapters": adapters,
+	}).Debug("Adapters found")
+
 	if len(path) == 0 {
 		adapter = adapters[0]
+
+		log.WithFields(log.Fields{
+			"adapter": adapter,
+		}).Debug("Using the first available CEC adapter")
+
 	} else {
 		var found bool
 		for _, adapter = range adapters {
@@ -53,8 +65,12 @@ func InitialiseCec(devices *DeviceRegistry, path string) (*Cec, error) {
 		}
 
 		if !found {
-			return nil, errors.New("")
+			return nil, errors.New("Adapter " + path + " has not been found")
 		}
+
+		log.WithFields(log.Fields{
+			"adapter": adapter,
+		}).Debug("Matched adapter")
 	}
 
 	cec.connection = connection
@@ -64,6 +80,10 @@ func InitialiseCec(devices *DeviceRegistry, path string) (*Cec, error) {
 }
 
 func (cec *Cec) RegisterMessageHandler(handler MessageReceivedHandler, opcodes ...gocec.Opcode) {
+	log.WithFields(log.Fields{
+		"opcodes": opcodes,
+	}).Trace("Registering message handler")
+
 	for _, opcode := range opcodes {
 		handlers, ok := cec.messageReceivedHandlers[opcode]
 		if !ok {
@@ -74,8 +94,14 @@ func (cec *Cec) RegisterMessageHandler(handler MessageReceivedHandler, opcodes .
 	}
 }
 
-func (cec *Cec) Start() {
-	cec.connection.Open(cec.adapter)
+func (cec *Cec) Start() error {
+	if err := cec.connection.Open(cec.adapter); err != nil {
+		return err
+	}
+
+	log.WithFields(log.Fields{
+		"adapter": cec.adapter,
+	}).Info("Opened CEC connection")
 
 	adapterAddress, _ := cec.connection.GetAdapterAddress()
 	addresses := cec.connection.ActiveDevices()
@@ -83,12 +109,29 @@ func (cec *Cec) Start() {
 	for _, address := range addresses {
 		// Don't register a device for the CEC adapter
 		if address != adapterAddress {
+			log.WithFields(log.Fields{
+				"logical_address": address,
+			}).Trace("Found active device")
 			_ = cec.GetDevice(address)
+		} else {
+			log.WithFields(log.Fields{
+				"logical_address": address,
+			}).Trace("Skipping active device as it's the adapter")
 		}
 	}
+
+	return nil
 }
 
 func (cec *Cec) handleLogMessage(logMessage *gocec.LogMessage) {
+	if cec.LibCecLoggingEnabled {
+		log.WithFields(log.Fields{
+			"message": logMessage.Message,
+			"time":    logMessage.Time,
+			"level":   logMessage.Level,
+		}).Debug("Incoming message from libcec")
+	}
+
 	if logMessage.Level != gocec.LogLevelTraffic {
 		return
 	}
@@ -101,10 +144,21 @@ func (cec *Cec) handleLogMessage(logMessage *gocec.LogMessage) {
 
 	device := cec.GetDevice(message.Source())
 
-	_ = device
+	context := log.WithFields(log.Fields{
+		"raw_message": logMessage.Message[3:],
+		"parsed_message": message,
+		"source.logical_address": message.Source(),
+		"source.device.id": device.Id,
+		"opcode": message.Opcode(),
+	})
+
+	context.Debug("Message received")
+
 
 	if handlers, ok := cec.messageReceivedHandlers[message.Opcode()]; ok {
 		for _, handler := range handlers {
+			context.Debug("Invoking handler")
+
 			handler(message)
 		}
 	}
@@ -128,5 +182,9 @@ func (cec *Cec) GetDevice(address gocec.LogicalAddress) *Device {
 }
 
 func (cec *Cec) Transmit(message gocec.Message) {
+	log.WithFields(log.Fields{
+		"message.text": message.String(),
+		"message.raw": []byte(message),
+	})
 	cec.connection.Transmit(message)
 }
