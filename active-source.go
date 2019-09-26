@@ -101,6 +101,15 @@ func (bridge *ActiveSourceBridge) updateActiveSource(newSource *Device) {
 
 	if newSource != nil {
 		if bridge.cec.connection.GetPowerStatus(newSource.LogicalAddress) == gocec.PowerStatusStandBy {
+			if bridge.activeSource == nil {
+				log.WithFields(log.Fields{
+					"device.id": newSource.Id,
+					"device.logical_address": newSource.LogicalAddress,
+				}).Trace("Skipping active source update because active device still is in standby")
+
+				return
+			}
+
 			newSource = nil
 		}
 	}
