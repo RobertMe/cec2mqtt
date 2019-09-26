@@ -52,10 +52,10 @@ func InitAcitveSourceBridge(container *Container) {
 
 	cec.RegisterMessageHandler(func(message gocec.Message) {
 		log.WithFields(log.Fields{
-			"message.source": message.Source(),
+			"message.source":      message.Source(),
 			"message.destination": message.Destination(),
-			"message.opcode": message.Opcode(),
-			"message.raw": []byte(message),
+			"message.opcode":      message.Opcode(),
+			"message.raw":         []byte(message),
 		}).Debug("Restarting active source monitor")
 
 		bridge.monitor.Reset()
@@ -63,15 +63,15 @@ func InitAcitveSourceBridge(container *Container) {
 
 	cec.RegisterMessageHandler(func(message gocec.Message) {
 		log.WithFields(log.Fields{
-			"message.source": message.Source(),
+			"message.source":      message.Source(),
 			"message.destination": message.Destination(),
-			"message.opcode": message.Opcode(),
-			"message.raw": []byte(message),
+			"message.opcode":      message.Opcode(),
+			"message.raw":         []byte(message),
 		}).Debug("Updating active source based on power status")
 
 		bridge.monitor.Reset()
 
-		if bridge.activeSource == nil ||  message.Source() != bridge.activeSource.LogicalAddress {
+		if bridge.activeSource == nil || message.Source() != bridge.activeSource.LogicalAddress {
 			return
 		}
 
@@ -103,7 +103,7 @@ func (bridge *ActiveSourceBridge) updateActiveSource(newSource *Device) {
 		if bridge.cec.connection.GetPowerStatus(newSource.LogicalAddress) == gocec.PowerStatusStandBy {
 			if bridge.activeSource == nil {
 				log.WithFields(log.Fields{
-					"device.id": newSource.Id,
+					"device.id":              newSource.Id,
 					"device.logical_address": newSource.LogicalAddress,
 				}).Trace("Skipping active source update because active device still is in standby")
 
@@ -124,7 +124,7 @@ func (bridge *ActiveSourceBridge) updateActiveSource(newSource *Device) {
 
 	log.WithFields(log.Fields{
 		"from": from,
-		"to": to,
+		"to":   to,
 	}).Info("Updating active source")
 
 	mqtt := bridge.mqtt

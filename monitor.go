@@ -8,23 +8,23 @@ type Runner func()
 type Monitor struct {
 	reset chan int
 
-	longInterval time.Duration
+	longInterval  time.Duration
 	shortInterval time.Duration
-	shortTimer *time.Timer
+	shortTimer    *time.Timer
 	shortDuration time.Duration
 
 	starter Starter
-	runner Runner
+	runner  Runner
 }
 
 func CreateMonitor(starter Starter, runner Runner, longInterval time.Duration, shortInterval time.Duration, shortDuration time.Duration) *Monitor {
 	monitor := &Monitor{
-		reset: make(chan int),
-		longInterval: longInterval,
+		reset:         make(chan int),
+		longInterval:  longInterval,
 		shortInterval: shortInterval,
 		shortDuration: shortDuration,
-		starter: starter,
-		runner: runner,
+		starter:       starter,
+		runner:        runner,
 	}
 
 	go monitor.run()
@@ -45,9 +45,9 @@ func (monitor *Monitor) run() {
 
 	for {
 		select {
-		case <- ticker.C:
+		case <-ticker.C:
 			monitor.runner()
-		case <- monitor.reset:
+		case <-monitor.reset:
 			ticker.Stop()
 			monitor.shortTimer.Stop()
 
@@ -57,7 +57,7 @@ func (monitor *Monitor) run() {
 			ticker = time.NewTicker(monitor.shortInterval)
 			monitor.shortTimer = time.NewTimer(monitor.shortDuration)
 
-		case <- monitor.shortTimer.C:
+		case <-monitor.shortTimer.C:
 			ticker.Stop()
 			monitor.shortTimer.Stop()
 

@@ -19,12 +19,11 @@ type Cec struct {
 }
 
 type CecDeviceDescription struct {
-	logicalAddress gocec.LogicalAddress
+	logicalAddress  gocec.LogicalAddress
 	physicalAddress gocec.PhysicalAddress
-	vendor gocec.Vendor
-	OSD string
+	vendor          gocec.Vendor
+	OSD             string
 }
-
 
 func InitialiseCec(devices *DeviceRegistry, path string) (*Cec, error) {
 	config := gocec.NewConfiguration("cec2mqtt", false)
@@ -32,7 +31,7 @@ func InitialiseCec(devices *DeviceRegistry, path string) (*Cec, error) {
 	config.SetMonitorOnly(false)
 
 	cec := &Cec{
-		devices: devices,
+		devices:                 devices,
 		messageReceivedHandlers: make(map[gocec.Opcode][]MessageReceivedHandler),
 	}
 	config.SetLogCallback(cec.handleLogMessage)
@@ -145,15 +144,14 @@ func (cec *Cec) handleLogMessage(logMessage *gocec.LogMessage) {
 	device := cec.GetDevice(message.Source())
 
 	context := log.WithFields(log.Fields{
-		"raw_message": logMessage.Message[3:],
-		"parsed_message": message,
+		"raw_message":            logMessage.Message[3:],
+		"parsed_message":         message,
 		"source.logical_address": message.Source(),
-		"source.device.id": device.Id,
-		"opcode": message.Opcode(),
+		"source.device.id":       device.Id,
+		"opcode":                 message.Opcode(),
 	})
 
 	context.Debug("Message received")
-
 
 	if handlers, ok := cec.messageReceivedHandlers[message.Opcode()]; ok {
 		for _, handler := range handlers {
@@ -174,7 +172,7 @@ func (cec *Cec) GetDevice(address gocec.LogicalAddress) *Device {
 			logicalAddress:  address,
 			physicalAddress: cec.connection.GetPhysicalAddress(address),
 			vendor:          cec.connection.GetVendor(address),
-			OSD:			 cec.connection.GetOSDName(address),
+			OSD:             cec.connection.GetOSDName(address),
 		}
 	}
 
@@ -184,7 +182,7 @@ func (cec *Cec) GetDevice(address gocec.LogicalAddress) *Device {
 func (cec *Cec) Transmit(message gocec.Message) {
 	log.WithFields(log.Fields{
 		"message.text": message.String(),
-		"message.raw": []byte(message),
+		"message.raw":  []byte(message),
 	})
 	cec.connection.Transmit(message)
 }

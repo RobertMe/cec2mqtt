@@ -98,7 +98,7 @@ func main() {
 	if nil != err {
 		log.WithFields(log.Fields{
 			"config": config.Mqtt,
-			"error": err,
+			"error":  err,
 		}).Fatal("Failed to connect to MQTT broker")
 	}
 
@@ -125,12 +125,12 @@ func main() {
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		<- signals
+		<-signals
 		done <- true
 	}()
 
 	log.Info("Cec2Mqtt started")
-	<- done
+	<-done
 	log.Info("Exiting")
 	config.Save(dataDir)
 	devices.Save(dataDir)

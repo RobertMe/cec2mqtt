@@ -12,7 +12,7 @@ type Mqtt struct {
 	config *MqttConfig
 }
 
-type MessageHandler func (payload []byte)
+type MessageHandler func(payload []byte)
 
 func ConnectMqtt(config *Config) (*Mqtt, error) {
 	mqttConfig := config.Mqtt
@@ -54,30 +54,30 @@ func ConnectMqtt(config *Config) (*Mqtt, error) {
 
 func (mqtt *Mqtt) BuildTopic(device *Device, suffix string) string {
 	topic := strings.Builder{}
-	fmt.Fprintf(&topic,"%s/%s/%s", mqtt.config.BaseTopic, device.Config.MqttTopic, suffix)
+	fmt.Fprintf(&topic, "%s/%s/%s", mqtt.config.BaseTopic, device.Config.MqttTopic, suffix)
 	return topic.String()
 }
 
 func (mqtt *Mqtt) Publish(topic string, qos byte, retained bool, payload interface{}) {
 	mqtt.client.Publish(topic, qos, retained, payload)
 	log.WithFields(log.Fields{
-		"topic": topic,
-		"qos": qos,
+		"topic":    topic,
+		"qos":      qos,
 		"retained": retained,
-		"payload": payload,
+		"payload":  payload,
 	}).Trace("Published MQTT message")
 }
 
 func (m *Mqtt) Subscribe(topic string, qos byte, callback MessageHandler) {
 	m.client.Subscribe(topic, qos, func(_ mqtt.Client, message mqtt.Message) {
 		log.WithFields(log.Fields{
-			"topic": message.Topic(),
+			"topic":   message.Topic(),
 			"payload": message.Payload(),
 		}).Trace("Handling incoming MQTT message")
 		callback(message.Payload())
 	})
 	log.WithFields(log.Fields{
 		"topic": topic,
-		"qos": qos,
+		"qos":   qos,
 	}).Trace("Subscribed to MQTT topic")
 }

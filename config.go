@@ -71,10 +71,10 @@ func (config *Config) Save(configPath string) error {
 		return err
 	}
 
-	err = ioutil.WriteFile(configPath + "config.yaml", data, 0644)
+	err = ioutil.WriteFile(configPath+"config.yaml", data, 0644)
 	if err != nil {
 		log.WithFields(log.Fields{
-			"error": err,
+			"error":       err,
 			"config_file": configPath + "config.yaml",
 		}).Error("Failed to save configuration to file")
 

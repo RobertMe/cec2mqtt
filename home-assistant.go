@@ -38,7 +38,7 @@ func (bridge *HomeAssistantBridge) RegisterSwitch(device *Device, property strin
 	fmt.Fprintf(&topic, "%s/switch/%s/%s/config", bridge.discoveryPrefix, device.Id, property)
 
 	config := bridge.createConfig(device, property)
-	config["command_topic"] = bridge.mqtt.BuildTopic(device, property + "/set")
+	config["command_topic"] = bridge.mqtt.BuildTopic(device, property+"/set")
 	config["payload_on"] = "on"
 	config["payload_off"] = "off"
 
@@ -46,9 +46,9 @@ func (bridge *HomeAssistantBridge) RegisterSwitch(device *Device, property strin
 	if err != nil {
 		log.WithFields(log.Fields{
 			"device.id": device.Config.Id,
-			"property": property,
-			"config": config,
-			"error": err,
+			"property":  property,
+			"config":    config,
+			"error":     err,
 		}).Error("Failed to convert switch configuration to JSON")
 
 		return
@@ -56,8 +56,8 @@ func (bridge *HomeAssistantBridge) RegisterSwitch(device *Device, property strin
 
 	log.WithFields(log.Fields{
 		"device.id": device.Config.Id,
-		"property": property,
-		"config": string(encoded),
+		"property":  property,
+		"config":    string(encoded),
 	}).Info("Registering switch in Home Assistant")
 
 	bridge.mqtt.Publish(topic.String(), 0, true, encoded)
@@ -75,9 +75,9 @@ func (bridge *HomeAssistantBridge) RegisterBinarySensor(device *Device, property
 	if err != nil {
 		log.WithFields(log.Fields{
 			"device.id": device.Config.Id,
-			"property": property,
-			"config": config,
-			"error": err,
+			"property":  property,
+			"config":    config,
+			"error":     err,
 		}).Error("Failed to convert binary sensor configuration to JSON")
 
 		return
@@ -85,8 +85,8 @@ func (bridge *HomeAssistantBridge) RegisterBinarySensor(device *Device, property
 
 	log.WithFields(log.Fields{
 		"device.id": device.Config.Id,
-		"property": property,
-		"config": string(encoded),
+		"property":  property,
+		"config":    string(encoded),
 	}).Info("Registering binary switch in Home Assistant")
 
 	bridge.mqtt.Publish(topic.String(), 0, true, encoded)
@@ -103,9 +103,9 @@ func (bridge *HomeAssistantBridge) createConfig(device *Device, property string)
 	}
 
 	deviceConfig := map[string]interface{}{
-		"identifiers": []string{"cec2mqtt_" + device.Id},
-		"name": device.CecDevice.OSD,
-		"sw_version": "Cec2Mqtt " + BuildVersion,
+		"identifiers":  []string{"cec2mqtt_" + device.Id},
+		"name":         device.CecDevice.OSD,
+		"sw_version":   "Cec2Mqtt " + BuildVersion,
 		"manufacturer": device.CecDevice.vendor.String(),
 	}
 
