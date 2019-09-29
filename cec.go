@@ -183,6 +183,6 @@ func (cec *Cec) Transmit(message gocec.Message) {
 	log.WithFields(log.Fields{
 		"message.text": message.String(),
 		"message.raw":  []byte(message),
-	})
+	}).Trace("Transmitting CEC message")
 	cec.connection.Transmit(message)
 }
