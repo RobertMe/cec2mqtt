@@ -165,7 +165,7 @@ func (bridge *PowerBridge) createStarter(device *Device) Starter {
 		source = gocec.DeviceBroadcast
 	}
 
-	message := gocec.Message{byte(source) + byte(device.LogicalAddress), byte(gocec.OpcodeGiveDevicePowerStatus)}
+	message := gocec.NewMessage(source, device.LogicalAddress, gocec.OpcodeGiveDevicePowerStatus, []byte{})
 
 	context := log.WithFields(log.Fields{
 		"device.logical_address": device.LogicalAddress,
