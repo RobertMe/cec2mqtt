@@ -11,11 +11,12 @@ func init() {
 }
 
 type ActiveSourceBridge struct {
-	cec          *Cec
-	mqtt         *Mqtt
-	activeSource *Device
-	devices      map[gocec.LogicalAddress]*Device
-	monitor      *Monitor
+	cec            *Cec
+	mqtt           *Mqtt
+	activeSource   *Device
+	devices        map[gocec.LogicalAddress]*Device
+	monitor        *Monitor
+	allowedSources map[gocec.LogicalAddress]bool
 }
 
 func InitAcitveSourceBridge(container *Container) {
@@ -23,10 +24,11 @@ func InitAcitveSourceBridge(container *Container) {
 	mqtt := container.Get("mqtt").(*Mqtt)
 
 	bridge := &ActiveSourceBridge{
-		cec:          cec,
-		mqtt:         mqtt,
-		activeSource: nil,
-		devices:      make(map[gocec.LogicalAddress]*Device),
+		cec:            cec,
+		mqtt:           mqtt,
+		activeSource:   nil,
+		devices:        make(map[gocec.LogicalAddress]*Device),
+		allowedSources: make(map[gocec.LogicalAddress]bool),
 	}
 
 	bridge.monitor = CreateMonitor(
@@ -41,6 +43,7 @@ func InitAcitveSourceBridge(container *Container) {
 
 	devices.RegisterDeviceAddedHandler(func(device *Device) {
 		bridge.devices[device.LogicalAddress] = device
+		bridge.allowedSources[device.LogicalAddress] = true
 	})
 
 	if haBridge, ok := container.Get("home-assistant").(*HomeAssistantBridge); ok {
@@ -69,13 +72,16 @@ func InitAcitveSourceBridge(container *Container) {
 			"message.raw":         []byte(message),
 		}).Debug("Updating active source based on power status")
 
-		bridge.monitor.Reset()
+		defer bridge.monitor.Reset()
+
+		powerStatus := gocec.PowerStatus(message.Parameters()[0])
+		bridge.allowedSources[message.Source()] = powerStatus != gocec.PowerStatusStandBy
 
 		if bridge.activeSource == nil || message.Source() != bridge.activeSource.LogicalAddress {
 			return
 		}
 
-		if gocec.PowerStatus(message.Parameters()[0]) == gocec.PowerStatusStandBy {
+		if powerStatus == gocec.PowerStatusStandBy {
 			bridge.updateActiveSource(nil)
 		}
 	}, gocec.OpcodeReportPowerStatus)
@@ -100,7 +106,7 @@ func (bridge *ActiveSourceBridge) updateActiveSource(newSource *Device) {
 	}
 
 	if newSource != nil {
-		if bridge.cec.connection.GetPowerStatus(newSource.LogicalAddress) == gocec.PowerStatusStandBy {
+		if allowed, ok := bridge.allowedSources[newSource.LogicalAddress]; ok && !allowed {
 			if bridge.activeSource == nil {
 				log.WithFields(log.Fields{
 					"device.id":              newSource.Id,
