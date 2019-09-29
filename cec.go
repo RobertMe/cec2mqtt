@@ -29,6 +29,7 @@ func InitialiseCec(devices *DeviceRegistry, path string) (*Cec, error) {
 	config := gocec.NewConfiguration("cec2mqtt", false)
 
 	config.SetMonitorOnly(false)
+	config.SetActivateSource(false)
 
 	cec := &Cec{
 		devices:                 devices,
