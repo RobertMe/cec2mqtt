@@ -13,9 +13,9 @@ services:
 env:
   - ARCH=amd64 HARDWARE=default PLATFORM=amd64
   - ARCH=arm32v7 HARDWARE=default PLATFORM=arm32/v7
-  - ARCH=arm64v8 HARDWARE=default PLATFORM=arm32/v7
+  - ARCH=arm64v8 HARDWARE=default PLATFORM=arm64/v8
   - ARCH=arm32v7 HARDWARE=rpi PLATFORM=arm32/v7
-  - ARCH=arm64v8 HARDWARE=rpi PLATFORM=arm32/v7
+  - ARCH=arm64v8 HARDWARE=rpi PLATFORM=arm64/v8
 
 before_script:
   - "echo '{\"experimental\": true}' | sudo tee /etc/docker/daemon.json"
