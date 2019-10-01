@@ -11,6 +11,11 @@ func init() {
 	RegisterInitializer(0, InitPowerBridge)
 }
 
+type PowerState struct {
+	state string
+	published bool
+}
+
 type PowerBridge struct {
 	cec  *Cec
 	mqtt *Mqtt
@@ -18,7 +23,7 @@ type PowerBridge struct {
 	monitors      map[string]*Monitor
 	monitorsMutex sync.Mutex
 
-	states      map[string]string
+	states      map[string]*PowerState
 	statesMutex sync.Mutex
 }
 
@@ -30,7 +35,7 @@ func InitPowerBridge(container *Container) {
 		mqtt: mqtt,
 
 		monitors: make(map[string]*Monitor),
-		states:   make(map[string]string),
+		states:   make(map[string]*PowerState),
 	}
 
 	container.Register("bridge.power", bridge)
@@ -41,7 +46,7 @@ func InitPowerBridge(container *Container) {
 		bridge.monitorsMutex.Lock()
 		defer bridge.statesMutex.Unlock()
 		defer bridge.monitorsMutex.Unlock()
-		bridge.states[device.Id] = "unknown"
+		bridge.states[device.Id] = &PowerState{state: "unknown", published: false}
 		bridge.monitors[device.Id] = CreateMonitor(
 			bridge.createStarter(device),
 			bridge.createRunner(device),
@@ -142,8 +147,9 @@ func (bridge *PowerBridge) setPowerStatus(device *Device, status gocec.PowerStat
 	}
 
 	bridge.statesMutex.Lock()
+	state := bridge.states[device.Id]
 	defer bridge.statesMutex.Unlock()
-	if bridge.states[device.Id] == value {
+	if state.state == value && state.published {
 		return
 	}
 
@@ -154,8 +160,14 @@ func (bridge *PowerBridge) setPowerStatus(device *Device, status gocec.PowerStat
 		"state.converted":        value,
 	}).Info("Updating power state")
 
-	bridge.states[device.Id] = value
-	go bridge.mqtt.Publish(bridge.mqtt.BuildTopic(device, "power"), 0, false, value)
+	state.state = value
+
+	if value != "unknown" || !state.published {
+		go bridge.mqtt.Publish(bridge.mqtt.BuildTopic(device, "power"), 0, false, value)
+		state.published = true
+	} else {
+		state.published = false
+	}
 }
 
 func (bridge *PowerBridge) createStarter(device *Device) Starter {
