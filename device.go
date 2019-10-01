@@ -27,6 +27,7 @@ type DeviceConfig struct {
 	VendorId        int    `yaml:"vendor_id"`
 	OSD             string `yaml:"osd"`
 	MqttTopic       string `yaml:"mqtt_topic"`
+	Ignore			bool `yaml:"ignore"`
 }
 
 type Device struct {
@@ -90,6 +91,12 @@ func (registry *DeviceRegistry) FindByLogicalAddress(address gocec.LogicalAddres
 		return nil
 	}
 
+	if device.Config.Ignore {
+		logContext.Debug("Found device by logical address, but it's ignored")
+
+		return nil
+	}
+
 	logContext.WithFields(log.Fields{
 		"device.id": device.Id,
 	}).Debug("Found device by logical address")
@@ -100,13 +107,24 @@ func (registry *DeviceRegistry) FindByLogicalAddress(address gocec.LogicalAddres
 func (registry *DeviceRegistry) GetByCecDevice(address gocec.LogicalAddress, creator CreateCecDeviceDescription) *Device {
 	registry.devicesMutex.Lock()
 
+	logContext := log.WithFields(log.Fields{
+		"logical_address": address,
+	})
+
 	if device, ok := registry.devices[address]; ok {
 		registry.devicesMutex.Unlock()
 
-		log.WithFields(log.Fields{
-			"logical_address": address,
+		logContext = logContext.WithFields(log.Fields{
 			"device.id":       device.Config.Id,
-		}).Trace("Found device by logical address")
+		})
+
+		if device.Config.Ignore {
+			logContext.Trace("Found device by logical address, but it's ignored")
+
+			return nil
+		}
+
+		logContext.Trace("Found device by logical address")
 
 		return device
 	}
@@ -120,13 +138,20 @@ func (registry *DeviceRegistry) GetByCecDevice(address gocec.LogicalAddress, cre
 			registry.devices[address] = device
 			registry.devicesMutex.Unlock()
 
-			log.WithFields(log.Fields{
-				"logical_address":  address,
+			logContext = logContext.WithFields(log.Fields{
 				"physical_address": description.physicalAddress,
 				"vendor_id":        description.vendor,
 				"description":      description,
 				"device.id":        device.Config.Id,
-			}).Debug("Found device by physical address and vendor")
+			})
+
+			if device.Config.Ignore {
+				logContext.Debug("Found device by physical address and vendor, but it's ignored")
+
+				return nil
+			}
+
+			logContext.Debug("Found device by physical address and vendor")
 
 			return device
 		}
@@ -146,13 +171,20 @@ func (registry *DeviceRegistry) GetByCecDevice(address gocec.LogicalAddress, cre
 
 	registry.devicesMutex.Unlock()
 
-	log.WithFields(log.Fields{
-		"logical_address":  address,
+	logContext = logContext.WithFields(log.Fields{
 		"physical_address": description.physicalAddress,
 		"vendor":           description.vendor,
 		"description":      description,
 		"device.id":        device.Config.Id,
-	}).Debug("Adding new device")
+	})
+
+	if deviceConfig.Ignore {
+		logContext.Debug("Added new device, but not registering it as it's ignored")
+
+		return nil
+	}
+
+	logContext.Debug("Adding new device")
 
 	for _, handler := range registry.deviceAddedHandlers {
 		handler(device)

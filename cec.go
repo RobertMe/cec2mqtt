@@ -144,6 +144,10 @@ func (cec *Cec) handleLogMessage(logMessage *gocec.LogMessage) {
 
 	device := cec.GetDevice(message.Source())
 
+	if device == nil {
+		return
+	}
+
 	context := log.WithFields(log.Fields{
 		"raw_message":            logMessage.Message[3:],
 		"parsed_message":         message,
