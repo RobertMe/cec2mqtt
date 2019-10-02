@@ -131,6 +131,19 @@ func (registry *DeviceRegistry) GetByCecDevice(address gocec.LogicalAddress, cre
 
 	description := creator()
 
+	if description.physicalAddress == [2]byte{0xFF, 0xFF} ||
+		description.vendor == gocec.VendorUnknown ||
+		description.OSD == "cec2mqtt" {
+		registry.devicesMutex.Unlock()
+		logContext.WithFields(log.Fields{
+			"description.physical_address": description.physicalAddress,
+			"description.vendor": uint(description.vendor),
+			"description.osd": description.OSD,
+		}).Debug("Ignoring device because it is incomplete or cec2mqtt")
+
+		return nil
+	}
+
 	device, ok := registry.physicalAddressMap[description.physicalAddress]
 	if ok {
 		if device.CecDevice.physicalAddress == description.physicalAddress &&
