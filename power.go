@@ -186,9 +186,15 @@ func (bridge *PowerBridge) createStarter(device *Device) Starter {
 		"message":                []byte(message),
 	})
 
+	var lastSend time.Time
+
 	return func() {
-		context.Trace("Requesting power state from monitor")
-		bridge.cec.Transmit(message)
+		now := time.Now()
+		if now.Sub(lastSend) > 10 * time.Second {
+			context.Trace("Requesting power state from monitor")
+			bridge.cec.Transmit(message)
+			lastSend = now
+		}
 	}
 }
 
