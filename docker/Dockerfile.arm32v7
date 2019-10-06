@@ -41,4 +41,6 @@ RUN if [ "$PLATFORM" == "rpi" ] ; then apk add raspberrypi-libs ; fi
 COPY --from=builder /usr/lib/libcec.so* /usr/lib/
 COPY --from=builder /go/src/cec2mqtt/cec2mqtt /usr/bin
 
+VOLUME /data/cec2mqtt
+
 CMD ["/usr/bin/cec2mqtt"]
