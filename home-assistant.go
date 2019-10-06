@@ -97,9 +97,12 @@ func (bridge *HomeAssistantBridge) createConfig(device *Device, property string)
 		"state_topic":           bridge.mqtt.BuildTopic(device, property),
 		"name":                  device.CecDevice.OSD + "_" + property,
 		"unique_id":             device.Id + "_" + property + "_" + bridge.config.Mqtt.BaseTopic,
-		"availability_topic":    bridge.config.Mqtt.StateTopic,
-		"payload_available":     bridge.config.Mqtt.BirthMessage,
-		"payload_not_available": bridge.config.Mqtt.WillMessage,
+	}
+
+	if bridge.config.Mqtt.StateTopic != "" {
+		config["availability_topic"] = bridge.config.Mqtt.StateTopic
+		config["payload_available"] = bridge.config.Mqtt.BirthMessage
+		config["payload_not_available"] = bridge.config.Mqtt.WillMessage
 	}
 
 	deviceConfig := map[string]interface{}{
