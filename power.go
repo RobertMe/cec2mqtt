@@ -17,22 +17,27 @@ type PowerState struct {
 }
 
 type PowerBridge struct {
-	cec  *Cec
-	mqtt *Mqtt
+	cec      *Cec
+	mqtt     *Mqtt
+	devices  *DeviceRegistry
+	haBridge *HomeAssistantBridge
 
 	monitors      map[string]*Monitor
 	monitorsMutex sync.Mutex
 
 	states      map[string]*PowerState
 	statesMutex sync.Mutex
+
 }
 
 func InitPowerBridge(container *Container) {
 	cec := container.Get("cec").(*Cec)
 	mqtt := container.Get("mqtt").(*Mqtt)
+	devices := container.Get("devices").(*DeviceRegistry)
 	bridge := PowerBridge{
 		cec:  cec,
 		mqtt: mqtt,
+		devices: devices,
 
 		monitors: make(map[string]*Monitor),
 		states:   make(map[string]*PowerState),
@@ -40,7 +45,6 @@ func InitPowerBridge(container *Container) {
 
 	container.Register("bridge.power", bridge)
 
-	devices := container.Get("devices").(*DeviceRegistry)
 	devices.RegisterDeviceAddedHandler(func(device *Device) {
 		bridge.statesMutex.Lock()
 		bridge.monitorsMutex.Lock()
@@ -81,9 +85,11 @@ func InitPowerBridge(container *Container) {
 
 	if haBridge, ok := container.Get("home-assistant").(*HomeAssistantBridge); ok {
 		log.Info("Enabling Home Assistant configuration for power")
+		bridge.haBridge = haBridge
 		devices.RegisterDeviceAddedHandler(func(device *Device) {
 			haBridge.RegisterSwitch(device, "power")
 		})
+		haBridge.RegisterBirthHandler(bridge.resendAll)
 	}
 
 	getDevice := func(address gocec.LogicalAddress) *Device {
@@ -124,6 +130,8 @@ func InitPowerBridge(container *Container) {
 			bridge.MonitorPower(deviceId)
 		}
 	}, gocec.OpcodeStandby, gocec.OpcodeActiveSource)
+
+	mqtt.RegisterConnectedHandler(bridge.resendAll)
 }
 
 func (bridge *PowerBridge) MonitorPower(deviceId string) {
@@ -209,5 +217,24 @@ func (bridge *PowerBridge) createRunner(device *Device) Runner {
 		}).Trace("Updating power from monitor")
 
 		bridge.setPowerStatus(device, status)
+	}
+}
+
+func (bridge *PowerBridge) resendAll() {
+	log.Debug("Resending all power states")
+	bridge.statesMutex.Lock()
+	defer bridge.statesMutex.Unlock()
+	for _, device := range bridge.devices.List() {
+		var state *PowerState
+		var ok bool
+		if state, ok = bridge.states[device.Id]; !ok {
+			continue
+		}
+
+		if bridge.haBridge != nil {
+			bridge.haBridge.RegisterSwitch(device, "power")
+		}
+
+		bridge.mqtt.Publish(bridge.mqtt.BuildTopic(device, "power"), 0, false, state.state)
 	}
 }
