@@ -11,10 +11,13 @@ func init() {
 	RegisterInitializer(100, InitHomeAssistantBridge)
 }
 
+type HomeAssistantBirthHandler func()
+
 type HomeAssistantBridge struct {
 	discoveryPrefix string
 	mqtt            *Mqtt
 	config          *Config
+	birthHandlers   []HomeAssistantBirthHandler
 }
 
 func InitHomeAssistantBridge(container *Container) {
@@ -24,13 +27,32 @@ func InitHomeAssistantBridge(container *Container) {
 		return
 	}
 
+	mqtt := container.Get("mqtt").(*Mqtt)
 	bridge := &HomeAssistantBridge{
 		discoveryPrefix: config.HomeAssistant.DiscoveryPrefix,
-		mqtt:            container.Get("mqtt").(*Mqtt),
+		mqtt:            mqtt,
 		config:          config,
+		birthHandlers:   make([]HomeAssistantBirthHandler, 0),
 	}
 
+	mqtt.Subscribe(config.HomeAssistant.BirthTopic, 0, func (payload []byte) {
+		log.WithFields(log.Fields{
+			"payload": string(payload),
+		}).Debug("Received message on Home Assistant birth topic")
+
+		if string(payload) == config.HomeAssistant.BirthPayload {
+			log.Info("Received Home Assistant birth message")
+			for _, handler := range bridge.birthHandlers {
+				handler()
+			}
+		}
+	})
+
 	container.Register("home-assistant", bridge)
+}
+
+func (bridge *HomeAssistantBridge) RegisterBirthHandler(handler HomeAssistantBirthHandler) {
+	bridge.birthHandlers = append(bridge.birthHandlers, handler)
 }
 
 func (bridge *HomeAssistantBridge) RegisterSwitch(device *Device, property string) {

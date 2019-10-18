@@ -20,6 +20,8 @@ type MqttConfig struct {
 type HomeAssistantConfig struct {
 	Enable          bool   `yaml:"enable"`
 	DiscoveryPrefix string `yaml:"discovery_prefix"`
+	BirthTopic      string `yaml:"birth_topic"`
+	BirthPayload    string `yaml:"birth_payload"`
 }
 
 type Config struct {
@@ -50,11 +52,23 @@ func ParseConfig(configPath string) (*Config, error) {
 		return nil, err
 	}
 
-	if config.HomeAssistant.Enable && config.HomeAssistant.DiscoveryPrefix == "" {
-		log.Debug("Home assistant integration is enabled but discovery prefix is not set. Setting default.")
-		config.HomeAssistant.DiscoveryPrefix = "homeassistant"
-	} else {
-		strings.Trim(config.HomeAssistant.DiscoveryPrefix, "/")
+	if config.HomeAssistant.Enable {
+		if config.HomeAssistant.DiscoveryPrefix == "" {
+			log.Debug("Home assistant integration is enabled but discovery prefix is not set. Setting default.")
+			config.HomeAssistant.DiscoveryPrefix = "homeassistant"
+		} else {
+			strings.Trim(config.HomeAssistant.DiscoveryPrefix, "/")
+		}
+
+		if config.HomeAssistant.BirthTopic == "" {
+			log.Debug("Home Assistant integration is enabled but birth topic is not set. Setting default.")
+			config.HomeAssistant.BirthTopic = "hass/status"
+		}
+
+		if config.HomeAssistant.BirthPayload == "" {
+			log.Debug("Home Assistant integration is enabled but birth payload is not set. Setting default.")
+			config.HomeAssistant.BirthTopic = "online"
+		}
 	}
 
 	return &config, nil
