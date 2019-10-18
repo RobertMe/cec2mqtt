@@ -7,9 +7,12 @@ import (
 	"strings"
 )
 
+type MqttConnectedHandler func()
+
 type Mqtt struct {
 	client mqtt.Client
 	config *MqttConfig
+	connectedHandlers []MqttConnectedHandler
 }
 
 type MessageHandler func(payload []byte)
@@ -32,24 +35,34 @@ func ConnectMqtt(config *Config) (*Mqtt, error) {
 		if mqttConfig.WillMessage != "" {
 			options.SetWill(mqttConfig.StateTopic, mqttConfig.WillMessage, 0, true)
 		}
-
-		if mqttConfig.BirthMessage != "" {
-			options.SetOnConnectHandler(func(client mqtt.Client) {
-				client.Publish(mqttConfig.StateTopic, 0, true, mqttConfig.BirthMessage)
-			})
-		}
 	}
 
-	client := mqtt.NewClient(options)
+	var client mqtt.Client
+	var inst *Mqtt
+
+	options.SetOnConnectHandler(func(client mqtt.Client) {
+		log.Info("Connected to MQTT")
+		if mqttConfig.StateTopic != "" && mqttConfig.BirthMessage != "" {
+			client.Publish(mqttConfig.StateTopic, 0, true, mqttConfig.BirthMessage)
+		}
+
+		for _, handler := range inst.connectedHandlers {
+			handler()
+		}
+	})
+
+	client = mqtt.NewClient(options)
 
 	connToken := client.Connect()
 
 	connToken.Wait()
 
-	return &Mqtt{
+	inst = &Mqtt{
 		client: client,
 		config: &mqttConfig,
-	}, nil
+	}
+
+	return inst, nil
 }
 
 func (mqtt *Mqtt) BuildTopic(device *Device, suffix string) string {
@@ -80,4 +93,8 @@ func (m *Mqtt) Subscribe(topic string, qos byte, callback MessageHandler) {
 		"topic": topic,
 		"qos":   qos,
 	}).Trace("Subscribed to MQTT topic")
+}
+
+func (m *Mqtt) RegisterConnectedHandler(handler MqttConnectedHandler) {
+	m.connectedHandlers = append(m.connectedHandlers, handler)
 }
