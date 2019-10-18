@@ -318,3 +318,14 @@ func (registry *DeviceRegistry) Save(configPath string) error {
 
 	return nil
 }
+
+func (registry *DeviceRegistry) List() []*Device {
+	registry.devicesMutex.Lock()
+	defer registry.devicesMutex.Unlock()
+
+	devices := make([]*Device, 0, len(registry.devices))
+	for _, device := range registry.devices {
+		devices = append(devices, device)
+	}
+	return devices
+}

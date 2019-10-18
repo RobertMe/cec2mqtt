@@ -14,20 +14,22 @@ type ActiveSourceBridge struct {
 	cec            *Cec
 	mqtt           *Mqtt
 	activeSource   *Device
-	devices        map[gocec.LogicalAddress]*Device
+	devices        *DeviceRegistry
 	monitor        *Monitor
 	allowedSources map[gocec.LogicalAddress]bool
+	haBridge       *HomeAssistantBridge
 }
 
 func InitAcitveSourceBridge(container *Container) {
 	cec := container.Get("cec").(*Cec)
 	mqtt := container.Get("mqtt").(*Mqtt)
+	devices := container.Get("devices").(*DeviceRegistry)
 
 	bridge := &ActiveSourceBridge{
 		cec:            cec,
 		mqtt:           mqtt,
 		activeSource:   nil,
-		devices:        make(map[gocec.LogicalAddress]*Device),
+		devices:        devices,
 		allowedSources: make(map[gocec.LogicalAddress]bool),
 	}
 
@@ -39,18 +41,17 @@ func InitAcitveSourceBridge(container *Container) {
 		1*time.Minute,
 	)
 
-	devices := container.Get("devices").(*DeviceRegistry)
-
 	devices.RegisterDeviceAddedHandler(func(device *Device) {
-		bridge.devices[device.LogicalAddress] = device
 		bridge.allowedSources[device.LogicalAddress] = true
 	})
 
 	if haBridge, ok := container.Get("home-assistant").(*HomeAssistantBridge); ok {
 		log.Info("Enabling Home Assistant configuration for active source")
+		bridge.haBridge = haBridge
 		devices.RegisterDeviceAddedHandler(func(device *Device) {
 			haBridge.RegisterBinarySensor(device, "is_active_source")
 		})
+		haBridge.RegisterBirthHandler(bridge.resendAll)
 	}
 
 	cec.RegisterMessageHandler(func(message gocec.Message) {
@@ -92,6 +93,8 @@ func InitAcitveSourceBridge(container *Container) {
 			bridge.updateActiveSource(nil)
 		}
 	}, gocec.OpcodeStandby)
+
+	mqtt.RegisterConnectedHandler(bridge.resendAll)
 
 	container.Register("active-source", bridge)
 }
@@ -159,8 +162,7 @@ func (bridge *ActiveSourceBridge) checkActiveSource() {
 	var newSource *Device = nil
 	newSourceId := ""
 	if address != gocec.DeviceUnknown {
-		var ok bool
-		if newSource, ok = bridge.devices[address]; ok {
+		if newSource = bridge.devices.FindByLogicalAddress(address); newSource != nil {
 			newSourceId = newSource.Id
 		}
 	}
@@ -171,4 +173,21 @@ func (bridge *ActiveSourceBridge) checkActiveSource() {
 	}).Trace("Updating active source from monitor")
 
 	bridge.updateActiveSource(newSource)
+}
+
+func (bridge *ActiveSourceBridge) resendAll() {
+	log.Debug("Resending all active source states")
+	for _, device := range bridge.devices.List() {
+		if bridge.haBridge != nil {
+			bridge.haBridge.RegisterBinarySensor(device, "is_active_source")
+		}
+
+		value := "off"
+		if device.Id == bridge.activeSource.Id {
+				value = "on"
+		}
+
+		bridge.mqtt.Publish(bridge.mqtt.BuildTopic(device, "is_active_source"), 0, false, value)
+
+	}
 }
