@@ -10,7 +10,7 @@ WORKDIR /root
 
 RUN apk add cmake make g++ eudev-dev p8-platform-dev
 
-ENV LIBCEC_VERSION=4.0.4
+ENV LIBCEC_VERSION=6.0.2
 
 COPY docker/install-libcec.base docker/install-libcec.${PLATFORM} ./
 
