@@ -19,7 +19,7 @@ WORKDIR /go/src/cec2mqtt
 
 FROM dev AS builder
 
-COPY *.go ./
+COPY . ./
 
 RUN apk add git
 
