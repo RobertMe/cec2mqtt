@@ -1,8 +1,0 @@
-#!/bin/sh
-
-set -e
-
-apk add raspberrypi-dev
-
-export BUILD_OPTIONS="-DRPI_INCLUDE_DIR=/opt/vc/include -DRPI_LIB_DIR=/opt/vc/lib"
-./install-libcec.base
