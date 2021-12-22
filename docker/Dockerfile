@@ -1,19 +1,29 @@
-ARG PLATFORM=default
-
 FROM golang:alpine AS dev
-ARG PLATFORM
 
 WORKDIR /root
 
-RUN apk add cmake make g++ eudev-dev p8-platform-dev
+RUN apk add cmake make g++ eudev-dev p8-platform-dev linux-headers
 
 ENV LIBCEC_VERSION=6.0.2
 
-COPY docker/install-libcec.base docker/install-libcec.${PLATFORM} ./
-
 ADD https://github.com/Pulse-Eight/libcec/archive/libcec-${LIBCEC_VERSION}.tar.gz .
 
-RUN ./install-libcec.$PLATFORM
+RUN rm -rf libcec \
+  && tar xf libcec-${LIBCEC_VERSION}.tar.gz \
+  && mv libcec-libcec-${LIBCEC_VERSION} libcec \
+  \
+  && mkdir libcec/build \
+  && cd libcec/build \
+  \
+  && cmake -DCMAKE_BUILD_TYPE=Release \
+       -DBUILD_SHARED_LIBS=1 \
+       -DCMAKE_INSTALL_PREFIX=/usr \
+       -DHAVE_LINUX_API=1 \
+       .. \
+  \
+  && make -j4 \
+  \
+  && make install
 
 WORKDIR /go/src/cec2mqtt
 
@@ -27,10 +37,8 @@ RUN go get -d -v .
 RUN go build -v -o cec2mqtt
 
 FROM alpine
-ARG PLATFORM
 
 RUN apk add p8-platform eudev
-RUN if [ "$PLATFORM" == "rpi" ] ; then apk add raspberrypi-libs ; fi
 
 COPY --from=builder /usr/lib/libcec.so* /usr/lib/
 COPY --from=builder /go/src/cec2mqtt/cec2mqtt /usr/bin
